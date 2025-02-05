@@ -5,23 +5,38 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
 // Processes to monitor
-var monitoredProcesses = []string{"minio", "e2_node_controller", "trash_cleaner", "rclone"}
+var monitoredProcesses = []string{"minio", "e2_node_controller_service", "trash-cleaner-service", "rclone", "kes", "vault", "load-simulator"}
+
+// Alert thresholds
+const (
+	CPUThreshold    = 10.0             // Alert if CPU > 80%
+	MemoryThreshold = 90.0             // Alert if RAM usage > 90%
+	AlertCooldown   = 60 * time.Second // Cooldown period for alerts
+)
 
 // Structs for JSON response
 type SystemStats struct {
 	CPUUsage        float64   `json:"cpu_usage"`
-	MemoryUsage     uint64    `json:"memory_usage"`
+	AvgLoad1        float64   `json:"avg_load"`
+	AvgLoad5        float64   `json:"avg_load5"`
+	AvgLoad15       float64   `json:"avg_load15"`
+	MemoryUsage     float64   `json:"memory_usage"`
 	TotalMemory     uint64    `json:"total_memory"`
+	TotalRead       uint64    `json:"total_read"`
+	TotalWrite      uint64    `json:"total_write"`
 	ActiveConnCount int       `json:"active_connections"`
 	LastUpdated     time.Time `json:"last_updated"`
 }
@@ -30,34 +45,82 @@ type ProcessMetrics struct {
 	Name     string  `json:"name"`
 	PID      int32   `json:"pid"`
 	CPUUsage float64 `json:"cpu_usage"`
-	MemUsage uint64  `json:"memory_usage"`
+	MemUsage float32 `json:"memory_usage"`
 }
+
+// Thresholds
+const HighLoadThreshold = 2.0
+const HighLoadDuration = 1 * time.Minute
+
+// Log file setup
+var logFile *os.File
+
+func init() {
+	var err error
+	logFile, err = os.OpenFile("watchdog.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %s", err)
+	}
+	log.SetOutput(logFile)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
+var highLoadStartTime time.Time
 
 // Global variables
 var (
 	systemStats  SystemStats
 	processStats []ProcessMetrics
 	statsLock    sync.RWMutex
+	lastCPUAlert time.Time
+	lastMemAlert time.Time
+	alertLock    sync.Mutex
 )
 
 // Collect system metrics
 func collectSystemMetrics() {
 	for {
-		cpuUsage, _ := cpu.Percent(time.Second, false)
+		cpuUsage, _ := cpu.Percent(time.Second, true)
 		memStats, _ := mem.VirtualMemory()
 		connCount, _ := getActiveConnections()
+		loadAvg, _ := load.Avg()
+		diskStats, _ := disk.IOCounters()
+		rootFsStats, _ := disk.Usage("/")
+
+		// Disk I/O
+		var totalRead, totalWrite uint64
+		for _, stats := range diskStats {
+			totalRead += stats.ReadBytes
+			totalWrite += stats.WriteBytes
+		}
 
 		statsLock.Lock()
+
 		systemStats = SystemStats{
 			CPUUsage:        cpuUsage[0],
-			MemoryUsage:     memStats.Used,
+			AvgLoad1:        loadAvg.Load1,
+			AvgLoad5:        loadAvg.Load5,
+			AvgLoad15:       loadAvg.Load15,
+			MemoryUsage:     memStats.UsedPercent,
 			TotalMemory:     memStats.Total,
+			TotalRead:       totalRead,
+			TotalWrite:      totalWrite,
 			ActiveConnCount: connCount,
 			LastUpdated:     time.Now(),
 		}
 		statsLock.Unlock()
+		// Log the system metrics
+		log.Printf("System Stats")
+		log.Printf("CPU Usage: %.2f%%, RAM Usage:  %.2f%%, Total RAM: %d MB, Active Connections: %d",
+			systemStats.CPUUsage, systemStats.MemoryUsage, systemStats.TotalMemory, connCount)
+		log.Printf("Load Avg (1m): %.2f, (5m): %.2f, (15m): %.2f",
+			systemStats.AvgLoad1, systemStats.AvgLoad5, systemStats.AvgLoad1)
+		log.Printf("Disk Read: %d MB, Disk Write: %d MB, Root FS Free: %d GB",
+			totalRead/1024/1024, totalWrite/1024/1024, rootFsStats.Free/1024/1024/1024)
 
-		time.Sleep(5 * time.Second) // Adjust as needed
+		// Check for alerts
+		checkAlerts(systemStats.AvgLoad1, systemStats.CPUUsage, systemStats.MemoryUsage)
+		time.Sleep(15 * time.Second) // Adjust as needed
 	}
 }
 
@@ -81,12 +144,13 @@ func collectProcessMetrics() {
 			for _, monitored := range monitoredProcesses {
 				if name == monitored {
 					cpuPercent, _ := proc.CPUPercent()
-					memInfo, _ := proc.MemoryInfo()
+					//memInfo, _ := proc.MemoryInfo()
+					memPercent, _ := proc.MemoryPercent()
 					metrics = append(metrics, ProcessMetrics{
 						Name:     name,
 						PID:      proc.Pid,
 						CPUUsage: cpuPercent,
-						MemUsage: memInfo.RSS,
+						MemUsage: memPercent,
 					})
 				}
 			}
@@ -94,9 +158,42 @@ func collectProcessMetrics() {
 
 		statsLock.Lock()
 		processStats = metrics
+		for _, metric := range metrics {
+			log.Printf("Process: %s, PID: %d, CPU Usage: %.2f%%, Memory Usage: %.2f%%", metric.Name, metric.PID, metric.CPUUsage, metric.MemUsage)
+		}
 		statsLock.Unlock()
 
-		time.Sleep(5 * time.Second) // Adjust interval as needed
+		time.Sleep(15 * time.Second) // Adjust interval as needed
+	}
+}
+
+// Check if system stats exceed thresholds and trigger alerts
+func checkAlerts(loadAvg1, cpuUsage float64, memUsage float64) {
+	alertLock.Lock()
+	defer alertLock.Unlock()
+
+	now := time.Now()
+	// High load detection logic
+	if loadAvg1 > HighLoadThreshold {
+		if highLoadStartTime.IsZero() {
+			highLoadStartTime = time.Now() // Start tracking high load time
+		} else if time.Since(highLoadStartTime) >= HighLoadDuration {
+			log.Println("[ALERT] System Load1 has been high for 5+ minutes!")
+			highLoadStartTime = time.Time{} // Reset timer after restart
+		}
+	} else {
+		highLoadStartTime = time.Time{} // Reset if load is normal
+	}
+	// CPU Alert
+	if cpuUsage > CPUThreshold && now.Sub(lastCPUAlert) > AlertCooldown {
+		log.Printf("[ALERT] High CPU Usage: %.2f%%", cpuUsage)
+		lastCPUAlert = now
+	}
+
+	// Memory Alert
+	if memUsage > MemoryThreshold && now.Sub(lastMemAlert) > AlertCooldown {
+		log.Printf("[ALERT] High Memory Usage: %.2f%%", memUsage)
+		lastMemAlert = now
 	}
 }
 
@@ -110,6 +207,7 @@ func systemMetricsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // API Handler: Get process metrics
+// if cpuusage and memusage are crossing threshold for 5 min interva then raise the alarm use ticker to check the threshold
 func processMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	statsLock.RLock()
 	defer statsLock.RUnlock()
