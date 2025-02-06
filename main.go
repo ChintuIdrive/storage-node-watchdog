@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,38 +20,70 @@ import (
 
 // Processes to monitor
 var monitoredProcesses = []string{"minio", "e2_node_controller_service", "trash-cleaner-service", "rclone", "kes", "vault", "load-simulator"}
+var monitoreddisks = []string{"/", "/data1", "/data2", "/data3", "/data4"}
 
 // Alert thresholds
 const (
-	CPUThreshold    = 10.0             // Alert if CPU > 80%
-	MemoryThreshold = 90.0             // Alert if RAM usage > 90%
-	AlertCooldown   = 60 * time.Second // Cooldown period for alerts
+	HighLoadThreshold = 2.0
+	HighLoadDuration  = 1 * time.Minute
+	CPUThreshold      = 10.0             // Alert if CPU > 80%
+	MemoryThreshold   = 90.0             // Alert if RAM usage > 90%
+	AlertCooldown     = 60 * time.Second // Cooldown period for alerts
 )
 
 // Structs for JSON response
 type SystemStats struct {
-	CPUUsage        float64   `json:"cpu_usage"`
-	AvgLoad1        float64   `json:"avg_load"`
-	AvgLoad5        float64   `json:"avg_load5"`
-	AvgLoad15       float64   `json:"avg_load15"`
-	MemoryUsage     float64   `json:"memory_usage"`
-	TotalMemory     uint64    `json:"total_memory"`
-	TotalRead       uint64    `json:"total_read"`
-	TotalWrite      uint64    `json:"total_write"`
-	ActiveConnCount int       `json:"active_connections"`
-	LastUpdated     time.Time `json:"last_updated"`
+	CPUStats        *CpuStats             `json:"cpu_stats"`
+	RAMStats        MemoryStats           `json:"ram_stats"`
+	DiskStatsMap    map[string]*DiskStats `json:"disk-stats-map"`
+	ActiveConnCount int                   `json:"active_connections"`
+	LastUpdated     time.Time             `json:"last_updated"`
 }
 
+type CpuStats struct {
+	CoreCount int     `json:"core_count"`
+	CPUUsage  float64 `json:"cpu_usage"`
+	AvgLoad1  float64 `json:"avg_load"`
+	AvgLoad5  float64 `json:"avg_load5"`
+	AvgLoad15 float64 `json:"avg_load15"`
+}
+
+type MemoryStats struct {
+	Total       uint64  `json:"total"`
+	Used        uint64  `json:"used"`
+	UsedPercent float64 `json:"used_persent"`
+	Free        uint64  `json:"free"`
+}
+
+type DiskStats struct {
+	DiskUsageStat *DiskUsageStat      `json:"disk-usage-stats"`
+	DiskIOStat    disk.IOCountersStat `json:"disk-io-stats"`
+}
+type DiskUsageStat struct {
+	Device      string  `json:"device"`
+	Path        string  `json:"path"`
+	Fstype      string  `json:"fstype"`
+	Total       uint64  `json:"total"`
+	Free        uint64  `json:"free"`
+	Used        uint64  `json:"used"`
+	UsedPercent float64 `json:"usedPercent"`
+}
+
+type StorageUsageStats struct {
+	OsDiskUsageStats    *DiskUsageStat `json:"os-disk-usage-stats"`
+	Data1DiskUsageStats *DiskUsageStat `json:"data1-disk-usage-stats"`
+	Data2DiskUsageStats *DiskUsageStat `json:"data2-disk-usage-stats"`
+	Data3DiskUsageStats *DiskUsageStat `json:"data3-disk-usage-stats"`
+	Data4DiskUsageStats *DiskUsageStat `json:"data4-disk-usage-stats"`
+	//metadata disk to do
+}
 type ProcessMetrics struct {
-	Name     string  `json:"name"`
-	PID      int32   `json:"pid"`
-	CPUUsage float64 `json:"cpu_usage"`
-	MemUsage float32 `json:"memory_usage"`
+	Name             string  `json:"name"`
+	PID              int32   `json:"pid"`
+	CPUUsage         float64 `json:"cpu_usage"`
+	MemUsage         float32 `json:"memory_usage"`
+	ConnectionsCount int     `json:"connections_count"`
 }
-
-// Thresholds
-const HighLoadThreshold = 2.0
-const HighLoadDuration = 1 * time.Minute
 
 // Log file setup
 var logFile *os.File
@@ -85,43 +118,95 @@ func collectSystemMetrics() {
 		connCount, _ := getActiveConnections()
 		loadAvg, _ := load.Avg()
 		diskStats, _ := disk.IOCounters()
-		rootFsStats, _ := disk.Usage("/")
-
-		// Disk I/O
-		var totalRead, totalWrite uint64
-		for _, stats := range diskStats {
-			totalRead += stats.ReadBytes
-			totalWrite += stats.WriteBytes
+		//rootFsStats, _ := disk.Usage("/")
+		corescount, _ := cpu.Counts(true)
+		log.Printf("number of core %d", corescount)
+		infoStats, _ := cpu.Info()
+		for _, infostat := range infoStats {
+			log.Printf("CPU Info: %v", infostat.String())
 		}
 
 		statsLock.Lock()
 
 		systemStats = SystemStats{
-			CPUUsage:        cpuUsage[0],
-			AvgLoad1:        loadAvg.Load1,
-			AvgLoad5:        loadAvg.Load5,
-			AvgLoad15:       loadAvg.Load15,
-			MemoryUsage:     memStats.UsedPercent,
-			TotalMemory:     memStats.Total,
-			TotalRead:       totalRead,
-			TotalWrite:      totalWrite,
+			CPUStats: &CpuStats{
+				CPUUsage:  cpuUsage[0],
+				AvgLoad1:  loadAvg.Load1,
+				AvgLoad5:  loadAvg.Load5,
+				AvgLoad15: loadAvg.Load15,
+				CoreCount: corescount,
+			},
+			RAMStats: MemoryStats{
+				Total:       memStats.Total,
+				Used:        memStats.Used,
+				UsedPercent: memStats.UsedPercent,
+				Free:        memStats.Free,
+			},
+			DiskStatsMap: make(map[string]*DiskStats),
+			// TotalRead:       totalRead,
+			// TotalWrite:      totalWrite,
 			ActiveConnCount: connCount,
 			LastUpdated:     time.Now(),
 		}
+		// Disk I/O
+		//diskUsageMap := make(map[string]*DiskUsageStat)
+		for _, diskName := range monitoreddisks {
+			diskUsageStat, err := disk.Usage(diskName)
+			if err != nil {
+				log.Printf("Error getting disk usage for %s: %v", diskName, err)
+				continue
+			}
+			devicePath, _ := getDeviceForMount(diskName)
+			deviceName := filepath.Base(devicePath) // Extracts "vdb1"
+			diskiotat := diskStats[deviceName]
+			diskUsageStats := &DiskUsageStat{
+				Device:      devicePath,
+				Path:        diskUsageStat.Path,
+				Fstype:      diskUsageStat.Fstype,
+				Total:       diskUsageStat.Total,
+				Free:        diskUsageStat.Free,
+				Used:        diskUsageStat.Used,
+				UsedPercent: diskUsageStat.UsedPercent,
+			}
+
+			diskStat := &DiskStats{
+				DiskUsageStat: diskUsageStats,
+				DiskIOStat:    diskiotat,
+			}
+			systemStats.DiskStatsMap[diskName] = diskStat
+			//diskUsageMap[diskName] =
+
+		}
+
 		statsLock.Unlock()
 		// Log the system metrics
 		log.Printf("System Stats")
 		log.Printf("CPU Usage: %.2f%%, RAM Usage:  %.2f%%, Total RAM: %d MB, Active Connections: %d",
-			systemStats.CPUUsage, systemStats.MemoryUsage, systemStats.TotalMemory, connCount)
+			systemStats.CPUStats.CPUUsage, systemStats.RAMStats.UsedPercent, systemStats.RAMStats.Total, connCount)
 		log.Printf("Load Avg (1m): %.2f, (5m): %.2f, (15m): %.2f",
-			systemStats.AvgLoad1, systemStats.AvgLoad5, systemStats.AvgLoad1)
-		log.Printf("Disk Read: %d MB, Disk Write: %d MB, Root FS Free: %d GB",
-			totalRead/1024/1024, totalWrite/1024/1024, rootFsStats.Free/1024/1024/1024)
+			systemStats.CPUStats.AvgLoad1, systemStats.CPUStats.AvgLoad5, systemStats.CPUStats.AvgLoad15)
+		// log.Printf("Disk Read: %d MB, Disk Write: %d MB, Root FS Free: %d GB",
+		// 	totalRead/1024/1024, totalWrite/1024/1024, rootFsStats.Free/1024/1024/1024)
 
 		// Check for alerts
-		checkAlerts(systemStats.AvgLoad1, systemStats.CPUUsage, systemStats.MemoryUsage)
+		checkAlerts(systemStats.CPUStats.AvgLoad1, systemStats.CPUStats.CPUUsage, systemStats.RAMStats.UsedPercent)
 		time.Sleep(15 * time.Second) // Adjust as needed
 	}
+}
+
+func getDeviceForMount(mountPoint string) (string, error) {
+	partitions, err := disk.Partitions(false) // Get all mounted filesystems
+	if err != nil {
+		return "", err
+	}
+
+	for _, partition := range partitions {
+		if partition.Mountpoint == mountPoint {
+			return partition.Device, nil
+		}
+	}
+
+	return "", fmt.Errorf("mount point %s not found", mountPoint)
 }
 
 // Get active network connections count
@@ -143,14 +228,17 @@ func collectProcessMetrics() {
 			name, _ := proc.Name()
 			for _, monitored := range monitoredProcesses {
 				if name == monitored {
+					proc.Connections()
 					cpuPercent, _ := proc.CPUPercent()
 					//memInfo, _ := proc.MemoryInfo()
 					memPercent, _ := proc.MemoryPercent()
+					connections, _ := proc.Connections()
 					metrics = append(metrics, ProcessMetrics{
-						Name:     name,
-						PID:      proc.Pid,
-						CPUUsage: cpuPercent,
-						MemUsage: memPercent,
+						Name:             name,
+						PID:              proc.Pid,
+						CPUUsage:         cpuPercent,
+						MemUsage:         memPercent,
+						ConnectionsCount: len(connections),
 					})
 				}
 			}
@@ -222,6 +310,8 @@ func main() {
 	go collectProcessMetrics()
 
 	// Setup API routes
+	// ApI to start and stop the process add authentication(using private and pulic key) for this ip based filtering
+	// certificate based authentication used dynamic string (use timestamp)
 	http.HandleFunc("/metrics", systemMetricsHandler)
 	http.HandleFunc("/process_metrics", processMetricsHandler)
 
