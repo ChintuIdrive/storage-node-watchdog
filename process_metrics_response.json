@@ -1,0 +1,86 @@
+[
+    {
+        "name": "e2_node_controller_service",
+        "pid": 568921,
+        "cpu_usage": 0.19130225729682213,
+        "memory_usage": 3.1969287,
+        "connections_count": 12
+    },
+    {
+        "name": "rclone",
+        "pid": 571201,
+        "cpu_usage": 0.3627738220379284,
+        "memory_usage": 0.7979355,
+        "connections_count": 2
+    },
+    {
+        "name": "vault",
+        "pid": 953279,
+        "cpu_usage": 0.21218129316776882,
+        "memory_usage": 4.8318014,
+        "connections_count": 4
+    },
+    {
+        "name": "kes",
+        "pid": 953335,
+        "cpu_usage": 0.01784730058735772,
+        "memory_usage": 0.9348232,
+        "connections_count": 2
+    },
+    {
+        "name": "trash-cleaner-service",
+        "pid": 1096077,
+        "cpu_usage": 0.007368677167940756,
+        "memory_usage": 0.30520067,
+        "connections_count": 3
+    },
+    {
+        "name": "minio",
+        "pid": 3443750,
+        "cpu_usage": 0.2401525834764959,
+        "memory_usage": 1.6191094,
+        "connections_count": 4
+    },
+    {
+        "name": "minio",
+        "pid": 3443780,
+        "cpu_usage": 0.24248030884150665,
+        "memory_usage": 2.0922163,
+        "connections_count": 4
+    },
+    {
+        "name": "minio",
+        "pid": 3443852,
+        "cpu_usage": 0.24026790098879158,
+        "memory_usage": 1.8695447,
+        "connections_count": 4
+    },
+    {
+        "name": "minio",
+        "pid": 3443894,
+        "cpu_usage": 0.23988808143132576,
+        "memory_usage": 2.0000255,
+        "connections_count": 4
+    },
+    {
+        "name": "minio",
+        "pid": 3443933,
+        "cpu_usage": 0.6855538817287915,
+        "memory_usage": 8.126718,
+        "connections_count": 4
+    },
+    {
+        "name": "minio",
+        "pid": 3443964,
+        "cpu_usage": 1.0310077293806996,
+        "memory_usage": 6.50293,
+        "connections_count": 4
+    },
+    {
+        "name": "minio",
+        "pid": 3449403,
+        "cpu_usage": 0.24922601648918324,
+        "memory_usage": 2.2752755,
+        "connections_count": 4
+    }
+]

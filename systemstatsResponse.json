@@ -1,0 +1,154 @@
+{
+    "cpu_stats": {
+        "core_count": 4,
+        "cpu_usage": 0.9900988053952974,
+        "avg_load": 0.02,
+        "avg_load5": 0.04,
+        "avg_load15": 0
+    },
+    "ram_stats": {
+        "total": 8055091200,
+        "used": 4854325248,
+        "used_persent": 60.264063155486056,
+        "free": 1520271360
+    },
+    "disk-stats-map": {
+        "/": {
+            "disk-usage-stats": {
+                "device": "/dev/vda1",
+                "path": "/",
+                "fstype": "xfs",
+                "total": 171787137024,
+                "free": 139551137792,
+                "used": 32235999232,
+                "usedPercent": 18.76508322476809
+            },
+            "disk-io-stats": {
+                "readCount": 10520981,
+                "mergedReadCount": 19839,
+                "writeCount": 18237106,
+                "mergedWriteCount": 4559406,
+                "readBytes": 520139335168,
+                "writeBytes": 251266534400,
+                "readTime": 1988920,
+                "writeTime": 9638512,
+                "iopsInProgress": 0,
+                "ioTime": 7635478,
+                "weightedIO": 11627432,
+                "name": "vda1",
+                "serialNumber": "",
+                "label": ""
+            }
+        },
+        "/data1": {
+            "disk-usage-stats": {
+                "device": "/dev/vdb1",
+                "path": "/data1",
+                "fstype": "xfs",
+                "total": 107321753600,
+                "free": 43719213056,
+                "used": 63602540544,
+                "usedPercent": 59.26341902784563
+            },
+            "disk-io-stats": {
+                "readCount": 8453535,
+                "mergedReadCount": 35216,
+                "writeCount": 31245645,
+                "mergedWriteCount": 2996724,
+                "readBytes": 297497639424,
+                "writeBytes": 1094327774208,
+                "readTime": 959337,
+                "writeTime": 28528098,
+                "iopsInProgress": 0,
+                "ioTime": 31448004,
+                "weightedIO": 29487436,
+                "name": "vdb1",
+                "serialNumber": "",
+                "label": ""
+            }
+        },
+        "/data2": {
+            "disk-usage-stats": {
+                "device": "/dev/vdb2",
+                "path": "/data2",
+                "fstype": "xfs",
+                "total": 107321753600,
+                "free": 43721117696,
+                "used": 63600635904,
+                "usedPercent": 59.261644327064
+            },
+            "disk-io-stats": {
+                "readCount": 8193606,
+                "mergedReadCount": 34134,
+                "writeCount": 31307603,
+                "mergedWriteCount": 3006553,
+                "readBytes": 294758360576,
+                "writeBytes": 1094497685504,
+                "readTime": 939458,
+                "writeTime": 28637951,
+                "iopsInProgress": 0,
+                "ioTime": 31579614,
+                "weightedIO": 29577410,
+                "name": "vdb2",
+                "serialNumber": "",
+                "label": ""
+            }
+        },
+        "/data3": {
+            "disk-usage-stats": {
+                "device": "/dev/vdb3",
+                "path": "/data3",
+                "fstype": "xfs",
+                "total": 107321753600,
+                "free": 43716845568,
+                "used": 63604908032,
+                "usedPercent": 59.265625
+            },
+            "disk-io-stats": {
+                "readCount": 8197806,
+                "mergedReadCount": 33765,
+                "writeCount": 31212685,
+                "mergedWriteCount": 2994761,
+                "readBytes": 294778982912,
+                "writeBytes": 1093618212352,
+                "readTime": 943310,
+                "writeTime": 28501289,
+                "iopsInProgress": 0,
+                "ioTime": 31357432,
+                "weightedIO": 29444600,
+                "name": "vdb3",
+                "serialNumber": "",
+                "label": ""
+            }
+        },
+        "/data4": {
+            "disk-usage-stats": {
+                "device": "/dev/vdb4",
+                "path": "/data4",
+                "fstype": "xfs",
+                "total": 107320709120,
+                "free": 43720073216,
+                "used": 63600635904,
+                "usedPercent": 59.26222108063537
+            },
+            "disk-io-stats": {
+                "readCount": 8368225,
+                "mergedReadCount": 33704,
+                "writeCount": 31178953,
+                "mergedWriteCount": 3040578,
+                "readBytes": 296738312192,
+                "writeBytes": 1093525113856,
+                "readTime": 951081,
+                "writeTime": 28708493,
+                "iopsInProgress": 0,
+                "ioTime": 31421113,
+                "weightedIO": 29659575,
+                "name": "vdb4",
+                "serialNumber": "",
+                "label": ""
+            }
+        }
+    },
+    "active_connections": 216,
+    "last_updated": "2025-02-07T01:47:48.191719145-05:00"
+}
