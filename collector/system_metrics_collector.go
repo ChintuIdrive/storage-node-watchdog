@@ -66,8 +66,12 @@ const (
 
 var highLoadStartTime time.Time
 
+type SyatemStatsCollector struct {
+	systemStats *SystemStats
+}
+
 // Collect system metrics
-func collectSystemMetrics() {
+func (smc *SyatemStatsCollector) CollectSystemMetrics() {
 	for {
 		cpuUsage, _ := cpu.Percent(time.Second, true)
 		memStats, _ := mem.VirtualMemory()
@@ -84,7 +88,7 @@ func collectSystemMetrics() {
 
 		statsLock.Lock()
 
-		systemStats = SystemStats{
+		smc.systemStats = &SystemStats{
 			CPUStats: &CpuStats{
 				CPUUsage:  cpuUsage[0],
 				AvgLoad1:  loadAvg.Load1,
@@ -129,7 +133,7 @@ func collectSystemMetrics() {
 				DiskUsageStat: diskUsageStats,
 				DiskIOStat:    diskiotat,
 			}
-			systemStats.DiskStatsMap[diskName] = diskStat
+			smc.systemStats.DiskStatsMap[diskName] = diskStat
 			//diskUsageMap[diskName] =
 
 		}
@@ -138,14 +142,14 @@ func collectSystemMetrics() {
 		// Log the system metrics
 		log.Printf("System Stats")
 		log.Printf("CPU Usage: %.2f%%, RAM Usage:  %.2f%%, Total RAM: %d MB, Active Connections: %d",
-			systemStats.CPUStats.CPUUsage, systemStats.RAMStats.UsedPercent, systemStats.RAMStats.Total, connCount)
+			smc.systemStats.CPUStats.CPUUsage, smc.systemStats.RAMStats.UsedPercent, smc.systemStats.RAMStats.Total, connCount)
 		log.Printf("Load Avg (1m): %.2f, (5m): %.2f, (15m): %.2f",
-			systemStats.CPUStats.AvgLoad1, systemStats.CPUStats.AvgLoad5, systemStats.CPUStats.AvgLoad15)
+			smc.systemStats.CPUStats.AvgLoad1, smc.systemStats.CPUStats.AvgLoad5, smc.systemStats.CPUStats.AvgLoad15)
 		// log.Printf("Disk Read: %d MB, Disk Write: %d MB, Root FS Free: %d GB",
 		// 	totalRead/1024/1024, totalWrite/1024/1024, rootFsStats.Free/1024/1024/1024)
 
 		// Check for alerts
-		checkAlerts(systemStats.CPUStats.AvgLoad1, systemStats.CPUStats.CPUUsage, systemStats.RAMStats.UsedPercent)
+		checkAlerts(smc.systemStats.CPUStats.AvgLoad1, smc.systemStats.CPUStats.CPUUsage, smc.systemStats.RAMStats.UsedPercent)
 		time.Sleep(15 * time.Second) // Adjust as needed
 	}
 }
@@ -205,10 +209,10 @@ func checkAlerts(loadAvg1, cpuUsage float64, memUsage float64) {
 }
 
 // API Handler: Get system stats
-func SystemMetricsHandler(w http.ResponseWriter, r *http.Request) {
+func (smc *SyatemStatsCollector) SystemMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	statsLock.RLock()
 	defer statsLock.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(systemStats)
+	json.NewEncoder(w).Encode(smc.systemStats)
 }

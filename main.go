@@ -36,8 +36,8 @@ func main() {
 	// Setup API routes
 	// ApI to start and stop the process add authentication(using private and pulic key) for this ip based filtering
 	// certificate based authentication used dynamic string (use timestamp)
-	http.HandleFunc("/metrics", collector.SystemMetricsHandler)
-	http.HandleFunc("/process_metrics", collector.ProcessMetricsHandler)
+	// http.HandleFunc("/metrics", collector.SystemMetricsHandler)
+	// http.HandleFunc("/process_metrics", collector.ProcessMetricsHandler)
 
 	fmt.Println("API running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

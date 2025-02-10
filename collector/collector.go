@@ -7,8 +7,6 @@ import (
 
 // Global variables
 var (
-	systemStats  SystemStats
-	processStats []ProcessMetrics
 	statsLock    sync.RWMutex
 	lastCPUAlert time.Time
 	lastMemAlert time.Time
@@ -17,6 +15,6 @@ var (
 
 func CollectMetrics() {
 	// Start background collectors
-	go collectSystemMetrics()
-	go collectProcessMetrics()
+	// go collectSystemMetrics()
+	// go collectProcessMetrics()
 }
