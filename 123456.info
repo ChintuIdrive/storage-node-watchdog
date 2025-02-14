@@ -1,0 +1,31 @@
+{
+  "PlannedRestart": false,
+  "public_buckets_enabled": false,
+  "user_type": 1,
+  "e2_userid": "cc5cb2b1-6332-11ee-9597-fa163e509412",
+  "userId": "tibicwtnynwk",
+  "dns": "sseg.nc11.edgedrive.com",
+  "ProcessId": 3443750,
+  "Password": {
+    "CString": "hz4uA0CfidVnqoyi4j\u002BwbQ=="
+  },
+  "admin_port": 0,
+  "s3_port": 8001,
+  "FailedS3HealthChecks": 0,
+  "ProcessStartTime": "2025-02-04T12:35:53.1621484-05:00",
+  "CNameList": [],
+  "MarkedForForceRestart": false,
+  "AllowedOrigin": "*",
+  "Compression": true,
+  "MaxApiRequests": 50,
+  "ApiRequestsDeadline": 1800000,
+  "enable_public_access_on_e2_url": false,
+  "IsFServer": false,
+  "TotalRequestsProcessed": 0,
+  "RequestsProcessInLastInterval": false,
+  "whitelist": [],
+  "NewServerAdded": false,
+  "ErrorStat": 0,
+  "UseDEC": false,
+  "UseHttp": true
+}

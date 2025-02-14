@@ -1,0 +1,37 @@
+{
+    "LocalMinioAdminEndpoint": "localhost:8006",
+    "TenantInfo": {
+      "PlannedRestart": false,
+      "public_buckets_enabled": false,
+      "user_type": 1,
+      "e2_userid": "5cde43af-e0fa-11ee-8940-fa163e509412",
+      "userId": "lyavaugkydiz",
+      "dns": "x1m0.nc02.edgedrive.com",
+      "ProcessId": 2391391,
+      "Password": {
+        "CString": "2cdUtFv3z2KoFg1iMuH4Yg=="
+      },
+      "admin_port": 0,
+      "s3_port": 8006,
+      "FailedS3HealthChecks": 0,
+      "ProcessStartTime": "2025-02-12T13:53:54.7316351-05:00",
+      "CNameList": [],
+      "MarkedForForceRestart": false,
+      "AllowedOrigin": "*",
+      "Compression": false,
+      "MaxApiRequests": 50,
+      "ApiRequestsDeadline": 1800000,
+      "enable_public_access_on_e2_url": false,
+      "IsFServer": false,
+      "TotalRequestsProcessed": 0,
+      "RequestsProcessInLastInterval": false,
+      "whitelist": [],
+      "NewServerAdded": false,
+      "ErrorStat": 0,
+      "UseDEC": true,
+      "UseHttp": true,
+      "UploadLimit": 0,
+      "DownloadLimit": 0
+    },
+    "StatusCode": 200
+  }
