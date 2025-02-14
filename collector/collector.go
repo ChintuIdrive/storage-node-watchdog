@@ -2,15 +2,11 @@ package collector
 
 import (
 	"sync"
-	"time"
 )
 
 // Global variables
 var (
-	statsLock    sync.RWMutex
-	lastCPUAlert time.Time
-	lastMemAlert time.Time
-	alertLock    sync.Mutex
+	statsLock sync.RWMutex
 )
 
 func CollectMetrics() {

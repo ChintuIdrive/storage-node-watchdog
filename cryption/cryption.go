@@ -3,84 +3,79 @@ package cryption
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/md5"
 	"encoding/base64"
-	"strings"
+	"fmt"
 )
 
+// Structure to parse JSON input
+type SecretData struct {
+	AccessKey  string  `json:"accessKey"`
+	SecretKey  SString `json:"secretKey"`
+	Expiration string  `json:"expiration"`
+	StatusCode int     `json:"StatusCode"`
+}
+
+// SString equivalent in Go
 type SString struct {
-	DummyChars []byte
-	_internal  string
+	CString string `json:"CString"`
+	DString string `json:"DString"`
 }
 
-func (s *SString) DString() string {
-	if strings.TrimSpace(s._internal) == "" || len(s.DummyChars) == 0 {
-		return s._internal
+// AES decryption function
+func (s SString) GetDString() (string, error) {
+	// Decode base64 CString
+	dummaBytes := []byte{
+		'0', '0', '0', '0', '0', '0', '0', '0',
+		'0', '0', '0', '0', '0', '0', '0', '0',
 	}
-	stringFromBase64, err := base64.StdEncoding.DecodeString(s._internal)
+	encryptedData, err := base64.StdEncoding.DecodeString(s.CString)
 	if err != nil {
-		return s._internal
+		return "", fmt.Errorf("failed to decode base64 string: %v", err)
 	}
-	decryptBytes, err := DecryptBytes(stringFromBase64, s.DummyChars, []byte("0000000000000000"))
+
+	// Use the provided DummyChars as key (converted to bytes)
+	key := []byte("E8AA3FBB0F512B32") // Must be exactly 16 bytes
+	//iv := make([]byte, aes.BlockSize) // IV is 16 bytes of zero (same as .NET)
+
+	// Decrypt AES-128-CBC
+	plaintext, err := decryptAES128CBC(encryptedData, key, dummaBytes)
 	if err != nil {
-		return string(stringFromBase64)
+		return "", fmt.Errorf("decryption failed: %v", err)
 	}
-	return string(decryptBytes)
+
+	return string(plaintext), nil
 }
 
-func (s *SString) SetDString(value string) {
-	if strings.TrimSpace(value) == "" || len(s.DummyChars) == 0 {
-		s._internal = value
-	} else {
-		encryptedBytes, _ := EncryptBytes([]byte(value), s.DummyChars, []byte("0000000000000000"))
-		s._internal = base64.StdEncoding.EncodeToString(encryptedBytes)
-	}
-}
-
-func (s *SString) CString() string {
-	return s._internal
-}
-
-func (s *SString) SetCString(value string) {
-	s._internal = value
-}
-
-func EncryptBytes(input, key, iv []byte) ([]byte, error) {
+// AES-128-CBC decryption with PKCS7 padding removal
+func decryptAES128CBC(encryptedData, key, iv []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	cfb := cipher.NewCFBEncrypter(block, iv)
-	ciphertext := make([]byte, len(input))
-	cfb.XORKeyStream(ciphertext, input)
-	return ciphertext, nil
-}
 
-func DecryptBytes(ciphertext, key, iv []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	cfb := cipher.NewCFBDecrypter(block, iv)
-	plaintext := make([]byte, len(ciphertext))
-	cfb.XORKeyStream(plaintext, ciphertext)
-	return plaintext, nil
-}
-
-func PassphraseToDefaultKeyAndIV(data, salt []byte, count int) ([]byte, []byte) {
-	hashList := make([]byte, 0)
-	preHash := append(data, salt...)
-	currentHash := md5.Sum(preHash)
-	hashList = append(hashList, currentHash[:]...)
-
-	for len(hashList) < 48 {
-		preHash = append(currentHash[:], data...)
-		preHash = append(preHash, salt...)
-		currentHash = md5.Sum(preHash)
-		hashList = append(hashList, currentHash[:]...)
+	if len(encryptedData) < aes.BlockSize {
+		return nil, fmt.Errorf("ciphertext too short")
 	}
 
-	key := hashList[:32]
-	iv := hashList[32:48]
-	return key, iv
+	mode := cipher.NewCBCDecrypter(block, iv)
+	decrypted := make([]byte, len(encryptedData))
+	mode.CryptBlocks(decrypted, encryptedData)
+
+	// Debug: Print decrypted bytes before removing padding
+	fmt.Println("Decrypted raw bytes:", decrypted)
+
+	// Remove PKCS7 padding
+	return removePKCS7Padding(decrypted)
+}
+
+// PKCS7 padding removal
+func removePKCS7Padding(data []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("empty data")
+	}
+	padding := int(data[len(data)-1])
+	if padding < 1 || padding > len(data) {
+		return nil, fmt.Errorf("invalid padding length")
+	}
+	return data[:len(data)-padding], nil
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/shirou/gopsutil/process"
 )
@@ -28,71 +27,61 @@ type ProcesMetricsCollector struct {
 	tenatProcessStats []TenantProcessMetrics
 }
 
+func NewProcesMetricsCollector() *ProcesMetricsCollector {
+	return &ProcesMetricsCollector{}
+}
+
 // Processes to monitor
-var monitoredProcesses = []string{"minio", "e2_node_controller_service", "trash-cleaner-service", "rclone", "kes", "vault", "load-simulator"}
+//var monitoredProcesses = []string{"minio", "e2_node_controller_service", "trash-cleaner-service", "rclone", "kes", "vault", "load-simulator"}
 
 // Collect per-process metrics
-func (pmc *ProcesMetricsCollector) CollectProcessMetrics() {
+func (pmc *ProcesMetricsCollector) CollectProcessMetrics(monitoredProcesses []string) []ProcessMetrics {
 
-	for {
-		processList, _ := process.Processes()
-		var metrics []ProcessMetrics
-		//var tenantMetrics []*TenantProcessMetrics
+	//for {
+	processList, _ := process.Processes()
+	var metrics []ProcessMetrics
 
-		for _, proc := range processList {
-			name, _ := proc.Name()
-			for _, monitored := range monitoredProcesses {
-				if name == monitored {
+	for _, proc := range processList {
+		name, _ := proc.Name()
+		for _, monitored := range monitoredProcesses {
+			if name == monitored {
 
-					cpuPercent, _ := proc.CPUPercent()
-					//memInfo, _ := proc.MemoryInfo()
-					memPercent, _ := proc.MemoryPercent()
-					connections, _ := proc.Connections()
-					processMetrics := ProcessMetrics{
-						Name:             name,
-						PID:              proc.Pid,
-						CPUUsage:         cpuPercent,
-						MemUsage:         memPercent,
-						ConnectionsCount: len(connections),
-					}
-					metrics = append(metrics, processMetrics)
-					// if processMetrics.Name == "minio" {
-					// 	processMetrics.IsTenant = true
-
-					// 	tenatProcess := &TenantProcessMetrics{
-					// 		ProcessMetrics: *processMetrics,
-					// 		DNS:            "ghhh",
-					// 	}
-					// 	tenantMetrics = append(tenantMetrics, tenatProcess)
-					// } else {
-					// 	metrics = append(metrics, processMetrics)
-					// }
-
+				cpuPercent, _ := proc.CPUPercent()
+				//memInfo, _ := proc.MemoryInfo()
+				memPercent, _ := proc.MemoryPercent()
+				connections, _ := proc.Connections()
+				processMetrics := ProcessMetrics{
+					Name:             name,
+					PID:              proc.Pid,
+					CPUUsage:         cpuPercent,
+					MemUsage:         memPercent,
+					ConnectionsCount: len(connections),
 				}
+				metrics = append(metrics, processMetrics)
 			}
 		}
-
-		statsLock.Lock()
-		pmc.processStats = metrics
-		//pmc.tenatProcessStats = tenantMetrics
-
-		statsLock.Unlock()
-
-		time.Sleep(15 * time.Second) // Adjust interval as needed
 	}
+
+	statsLock.Lock()
+	pmc.processStats = metrics
+	statsLock.Unlock()
+
+	return pmc.processStats
+	//time.Sleep(15 * time.Second) // Adjust interval as needed
+	//}
 }
 
 func (pmc *ProcesMetricsCollector) GetProcessMetrics() []ProcessMetrics {
 	return pmc.processStats
 }
 
-func (pmc *ProcesMetricsCollector) CollectMinioMetrics() {
+func (pmc *ProcesMetricsCollector) CollectRunningTenantProcMetrics(tenatProcessName string) []TenantProcessMetrics {
 	processList, _ := process.Processes()
 	var tenantMetrics []TenantProcessMetrics
 
 	for _, proc := range processList {
 		name, _ := proc.Name()
-		if strings.ToLower(name) == "minio" {
+		if strings.ToLower(name) == tenatProcessName {
 			cpuPercent, _ := proc.CPUPercent()
 			//memInfo, _ := proc.MemoryInfo()
 			memPercent, _ := proc.MemoryPercent()
@@ -115,7 +104,7 @@ func (pmc *ProcesMetricsCollector) CollectMinioMetrics() {
 	statsLock.Lock()
 	pmc.tenatProcessStats = tenantMetrics
 	statsLock.Unlock()
-
+	return pmc.tenatProcessStats
 }
 func (pmc *ProcesMetricsCollector) GetMinioProcessMetrics() []TenantProcessMetrics {
 	return pmc.tenatProcessStats

@@ -53,105 +53,88 @@ type DiskUsageStat struct {
 	UsedPercent float64 `json:"usedPercent"`
 }
 
-var monitoreddisks = []string{"/", "/data1", "/data2", "/data3", "/data4"}
-
-// Alert thresholds
-const (
-	HighLoadThreshold = 2.0
-	HighLoadDuration  = 1 * time.Minute
-	CPUThreshold      = 10.0             // Alert if CPU > 80%
-	MemoryThreshold   = 90.0             // Alert if RAM usage > 90%
-	AlertCooldown     = 60 * time.Second // Cooldown period for alerts
-)
-
-var highLoadStartTime time.Time
+//var monitoreddisks = []string{"/", "/data1", "/data2", "/data3", "/data4"}
 
 type SyatemStatsCollector struct {
 	systemStats *SystemStats
 }
 
 // Collect system metrics
-func (smc *SyatemStatsCollector) CollectSystemMetrics() {
-	for {
-		cpuUsage, _ := cpu.Percent(time.Second, true)
-		memStats, _ := mem.VirtualMemory()
-		connCount, _ := getActiveConnections()
-		loadAvg, _ := load.Avg()
-		diskStats, _ := disk.IOCounters()
-		//rootFsStats, _ := disk.Usage("/")
-		corescount, _ := cpu.Counts(true)
-		log.Printf("number of core %d", corescount)
-		infoStats, _ := cpu.Info()
-		for _, infostat := range infoStats {
-			log.Printf("CPU Info: %v", infostat.String())
-		}
-
-		statsLock.Lock()
-
-		smc.systemStats = &SystemStats{
-			CPUStats: &CpuStats{
-				CPUUsage:  cpuUsage[0],
-				AvgLoad1:  loadAvg.Load1,
-				AvgLoad5:  loadAvg.Load5,
-				AvgLoad15: loadAvg.Load15,
-				CoreCount: corescount,
-			},
-			RAMStats: MemoryStats{
-				Total:       memStats.Total,
-				Used:        memStats.Used,
-				UsedPercent: memStats.UsedPercent,
-				Free:        memStats.Free,
-			},
-			DiskStatsMap: make(map[string]*DiskStats),
-			// TotalRead:       totalRead,
-			// TotalWrite:      totalWrite,
-			ActiveConnCount: connCount,
-			LastUpdated:     time.Now(),
-		}
-		// Disk I/O
-		//diskUsageMap := make(map[string]*DiskUsageStat)
-		for _, diskName := range monitoreddisks {
-			diskUsageStat, err := disk.Usage(diskName)
-			if err != nil {
-				log.Printf("Error getting disk usage for %s: %v", diskName, err)
-				continue
-			}
-			devicePath, _ := getDeviceForMount(diskName)
-			deviceName := filepath.Base(devicePath) // Extracts "vdb1"
-			diskiotat := diskStats[deviceName]
-			diskUsageStats := &DiskUsageStat{
-				Device:      devicePath,
-				Path:        diskUsageStat.Path,
-				Fstype:      diskUsageStat.Fstype,
-				Total:       diskUsageStat.Total,
-				Free:        diskUsageStat.Free,
-				Used:        diskUsageStat.Used,
-				UsedPercent: diskUsageStat.UsedPercent,
-			}
-
-			diskStat := &DiskStats{
-				DiskUsageStat: diskUsageStats,
-				DiskIOStat:    diskiotat,
-			}
-			smc.systemStats.DiskStatsMap[diskName] = diskStat
-			//diskUsageMap[diskName] =
-
-		}
-
-		statsLock.Unlock()
-		// Log the system metrics
-		log.Printf("System Stats")
-		log.Printf("CPU Usage: %.2f%%, RAM Usage:  %.2f%%, Total RAM: %d MB, Active Connections: %d",
-			smc.systemStats.CPUStats.CPUUsage, smc.systemStats.RAMStats.UsedPercent, smc.systemStats.RAMStats.Total, connCount)
-		log.Printf("Load Avg (1m): %.2f, (5m): %.2f, (15m): %.2f",
-			smc.systemStats.CPUStats.AvgLoad1, smc.systemStats.CPUStats.AvgLoad5, smc.systemStats.CPUStats.AvgLoad15)
-		// log.Printf("Disk Read: %d MB, Disk Write: %d MB, Root FS Free: %d GB",
-		// 	totalRead/1024/1024, totalWrite/1024/1024, rootFsStats.Free/1024/1024/1024)
-
-		// Check for alerts
-		checkAlerts(smc.systemStats.CPUStats.AvgLoad1, smc.systemStats.CPUStats.CPUUsage, smc.systemStats.RAMStats.UsedPercent)
-		time.Sleep(15 * time.Second) // Adjust as needed
+func (smc *SyatemStatsCollector) CollectSystemMetrics(monitoreddisks []string) *SystemStats {
+	cpuUsage, _ := cpu.Percent(time.Second, true)
+	memStats, _ := mem.VirtualMemory()
+	connCount, _ := getActiveConnections()
+	loadAvg, _ := load.Avg()
+	diskStats, _ := disk.IOCounters()
+	//rootFsStats, _ := disk.Usage("/")
+	corescount, _ := cpu.Counts(true)
+	log.Printf("number of core %d", corescount)
+	infoStats, _ := cpu.Info()
+	for _, infostat := range infoStats {
+		log.Printf("CPU Info: %v", infostat.String())
 	}
+
+	statsLock.Lock()
+
+	smc.systemStats = &SystemStats{
+		CPUStats: &CpuStats{
+			CPUUsage:  cpuUsage[0],
+			AvgLoad1:  loadAvg.Load1,
+			AvgLoad5:  loadAvg.Load5,
+			AvgLoad15: loadAvg.Load15,
+			CoreCount: corescount,
+		},
+		RAMStats: MemoryStats{
+			Total:       memStats.Total,
+			Used:        memStats.Used,
+			UsedPercent: memStats.UsedPercent,
+			Free:        memStats.Free,
+		},
+		DiskStatsMap: make(map[string]*DiskStats),
+		// TotalRead:       totalRead,
+		// TotalWrite:      totalWrite,
+		ActiveConnCount: connCount,
+		LastUpdated:     time.Now(),
+	}
+	// Disk I/O
+	//diskUsageMap := make(map[string]*DiskUsageStat)
+	for _, diskName := range monitoreddisks {
+		diskUsageStat, err := disk.Usage(diskName)
+		if err != nil {
+			log.Printf("Error getting disk usage for %s: %v", diskName, err)
+			continue
+		}
+		devicePath, _ := getDeviceForMount(diskName)
+		deviceName := filepath.Base(devicePath) // Extracts "vdb1"
+		diskiotat := diskStats[deviceName]
+		diskUsageStats := &DiskUsageStat{
+			Device:      devicePath,
+			Path:        diskUsageStat.Path,
+			Fstype:      diskUsageStat.Fstype,
+			Total:       diskUsageStat.Total,
+			Free:        diskUsageStat.Free,
+			Used:        diskUsageStat.Used,
+			UsedPercent: diskUsageStat.UsedPercent,
+		}
+
+		diskStat := &DiskStats{
+			DiskUsageStat: diskUsageStats,
+			DiskIOStat:    diskiotat,
+		}
+		smc.systemStats.DiskStatsMap[diskName] = diskStat
+		//diskUsageMap[diskName] =
+
+	}
+
+	statsLock.Unlock()
+
+	// log.Printf("Disk Read: %d MB, Disk Write: %d MB, Root FS Free: %d GB",
+	// 	totalRead/1024/1024, totalWrite/1024/1024, rootFsStats.Free/1024/1024/1024)
+
+	// Check for alerts
+
+	return smc.systemStats
+
 }
 
 func getDeviceForMount(mountPoint string) (string, error) {
@@ -176,36 +159,6 @@ func getActiveConnections() (int, error) {
 		return 0, err
 	}
 	return len(connections), nil
-}
-
-// Check if system stats exceed thresholds and trigger alerts
-func checkAlerts(loadAvg1, cpuUsage float64, memUsage float64) {
-	alertLock.Lock()
-	defer alertLock.Unlock()
-
-	now := time.Now()
-	// High load detection logic
-	if loadAvg1 > HighLoadThreshold {
-		if highLoadStartTime.IsZero() {
-			highLoadStartTime = time.Now() // Start tracking high load time
-		} else if time.Since(highLoadStartTime) >= HighLoadDuration {
-			log.Println("[ALERT] System Load1 has been high for 5+ minutes!")
-			highLoadStartTime = time.Time{} // Reset timer after restart
-		}
-	} else {
-		highLoadStartTime = time.Time{} // Reset if load is normal
-	}
-	// CPU Alert
-	if cpuUsage > CPUThreshold && now.Sub(lastCPUAlert) > AlertCooldown {
-		log.Printf("[ALERT] High CPU Usage: %.2f%%", cpuUsage)
-		lastCPUAlert = now
-	}
-
-	// Memory Alert
-	if memUsage > MemoryThreshold && now.Sub(lastMemAlert) > AlertCooldown {
-		log.Printf("[ALERT] High Memory Usage: %.2f%%", memUsage)
-		lastMemAlert = now
-	}
 }
 
 // API Handler: Get system stats
