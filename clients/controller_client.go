@@ -1,27 +1,25 @@
 package clients
 
 import (
+	"ChintuIdrive/storage-node-watchdog/conf"
 	"ChintuIdrive/storage-node-watchdog/cryption"
 	"ChintuIdrive/storage-node-watchdog/dto"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 type ControllerClient struct {
-	controllerDNS     string
-	addServiceAccount string
-	getTenantInfo     string
+	controllerConfig *conf.ControllerConfig
 }
 
-func NewControllerClientt(controllerDNS, addServiceAccount, getTenantInfo string) *ControllerClient {
+func NewControllerClientt(controllerConfig *conf.ControllerConfig) *ControllerClient {
 	return &ControllerClient{
-		controllerDNS:     controllerDNS,
-		addServiceAccount: addServiceAccount,
-		getTenantInfo:     getTenantInfo,
+		controllerConfig: controllerConfig,
 	}
 }
 func (cc *ControllerClient) GetTenantListFromController() ([]dto.TenatWithProcessInfo, error) {
@@ -65,7 +63,7 @@ func (cc *ControllerClient) GetTenantListFromController() ([]dto.TenatWithProces
 
 func (cc *ControllerClient) GetAccessKeys(tenat dto.Tenant) (*cryption.SecretData, error) {
 
-	url := fmt.Sprintf("https://%s/%s", cc.controllerDNS, cc.addServiceAccount)
+	url := fmt.Sprintf("https://%s/%s", cc.controllerConfig.ControllerDNS, cc.controllerConfig.AddServiceAccountApi)
 	method := "POST"
 	// url := "https://localhost:44344/admin/v1/add_service_account"
 	// method := "POST"
@@ -113,7 +111,7 @@ func (cc *ControllerClient) GetAccessKeys(tenat dto.Tenant) (*cryption.SecretDat
 
 func (cc *ControllerClient) GetTenantWithProcessInfo(tenat dto.Tenant) (*dto.TenatWithProcessInfo, error) {
 
-	url := fmt.Sprintf("https://%s/%s", cc.controllerDNS, cc.getTenantInfo)
+	url := fmt.Sprintf("https://%s/%s", cc.controllerConfig.ControllerDNS, cc.controllerConfig.GetTenantInfoApi)
 	method := "POST"
 
 	clientreq := dto.TenantProcessInfoReq{
@@ -148,4 +146,69 @@ func (cc *ControllerClient) GetTenantWithProcessInfo(tenat dto.Tenant) (*dto.Ten
 	}
 
 	return &resp.TenatWithProcessInfo, err
+}
+
+func (cc *ControllerClient) GetSavedAccessKey(tenant dto.Tenant) (*cryption.SecretData, error) {
+	var accessKeys *cryption.SecretData
+	s3credentialsPath := filepath.Join(cc.controllerConfig.AccessKeyDir, tenant.DNS, "s3-credentials.json")
+	data, err := os.ReadFile(s3credentialsPath)
+	if err != nil {
+		// If the file does not exist, create a default S3Config
+		log.Printf("S3 configuration not available for tenant %s, adding default configuration", tenant.DNS)
+		return cc.LoadS3Credentials(tenant)
+	}
+	err = json.Unmarshal(data, &accessKeys)
+	if err != nil {
+		fmt.Println(err)
+		return accessKeys, err
+	}
+	return accessKeys, nil
+}
+func (cc *ControllerClient) LadAccessKeys(tenantsFromApiServer []dto.Tenant) {
+
+	for _, tenant := range tenantsFromApiServer {
+		cc.LoadS3Credentials(tenant)
+	}
+
+}
+
+func (cc *ControllerClient) LoadS3Credentials(tenant dto.Tenant) (*cryption.SecretData, error) {
+	accKey, err := cc.GetAccessKeys(tenant)
+	if err != nil {
+		log.Printf("Failed to get access keys for tenant %s: %v", tenant.DNS, err)
+		return nil, err
+	}
+	ds, err := accKey.SecretKey.GetDString()
+	if err != nil {
+		log.Printf("Failed to get DString for tenant %s: %v", tenant.DNS, err)
+		return nil, err
+	}
+	accKey.SecretKey.DString = ds
+	if err != nil {
+		log.Printf("Failed to set secret key for tenant %s: %v", tenant.DNS, err)
+	}
+	accKeyDir := filepath.Join(cc.controllerConfig.AccessKeyDir, tenant.DNS)
+	if _, err := os.Stat(accKeyDir); os.IsNotExist(err) {
+		err := os.MkdirAll(cc.controllerConfig.AccessKeyDir, os.ModePerm)
+		if err != nil {
+			log.Printf("Failed to create access key directory: %v", err)
+			return nil, err
+		}
+	}
+	accKeyFilePath := filepath.Join(accKeyDir, "s3-credentials.json")
+	accessKeyFile, err := os.Create(accKeyFilePath)
+	if err != nil {
+		log.Printf("Failed to create access key file for tenant %s: %v", tenant.DNS, err)
+		return nil, err
+	}
+	defer accessKeyFile.Close()
+
+	accessKeyData, err := json.MarshalIndent(accKey, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal access key data for tenant %s: %v", tenant.DNS, err)
+		return nil, err
+	}
+
+	accessKeyFile.Write(accessKeyData)
+	return accKey, nil
 }

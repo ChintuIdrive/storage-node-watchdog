@@ -103,15 +103,32 @@ func (s *S3Client) ListBuckets() ([]types.Bucket, error) {
 	}
 	return buckets, err
 }
-
-func (s *S3Client) ListObjectsForBucket(bucket string) error {
+func (client *S3Client) ObjectsCountForBucket(bucketName string) (int, error) {
+	input := &s3.ListObjectsV2Input{
+		Bucket: aws.String(bucketName),
+	}
+	result, err := client.client.ListObjectsV2(context.TODO(), input)
+	if err != nil {
+		return 0, err
+	}
+	return len(result.Contents), nil
+}
+func (s *S3Client) ListObjectsForBucket(bucket string, numOfPagesToList int) (int, error) {
 	if bucket == "" {
-		return nil
+		return 0, nil
 	}
 
 	params := &s3.ListObjectsV2Input{
 		Bucket: &bucket,
 	}
+	// it will return max 1000 objects
+	// result, err := s.client.ListObjectsV2(context.TODO(), params)
+	// if err != nil {
+	// 	log.Printf("Couldn't list objects in bucket %q. Here's why: %v", bucket, err)
+	// }
+
+	// log.Printf("Found %d objects in bucket %q", len(result.Contents), bucket)
+
 	maxKeys := 1000
 	paginator := s3.NewListObjectsV2Paginator(s.client, params, func(o *s3.ListObjectsV2PaginatorOptions) {
 		if v := int32(maxKeys); v != 0 {
@@ -119,24 +136,66 @@ func (s *S3Client) ListObjectsForBucket(bucket string) error {
 		}
 	})
 
-	var i int
-	for paginator.HasMorePages() {
-		i++
+	var objectCount int
+	var err error
+	if numOfPagesToList >= 1 {
+		objectCount, err = getObjCount(paginator, numOfPagesToList)
+	} else {
+		objectCount, err = getAllObjCount(paginator)
+	}
+	return objectCount, err
+}
+func getObjCount(paginator *s3.ListObjectsV2Paginator, numOfPagesToList int) (int, error) {
+	var pagesCount int
+	var objectCount int
+	for paginator.HasMorePages() && (pagesCount < numOfPagesToList) {
+		pagesCount++
 
 		// Next Page takes a new context for each page retrieval. This is where
 		// you could add timeouts or deadlines.
 		page, err := paginator.NextPage(context.TODO())
 		if err != nil {
-			return err
+			return objectCount, err
 		}
-		_ = page
+		//_ = page
 		// Log the objects found
-		for _, obj := range page.Contents {
-			fmt.Println("Object:", *obj.Key)
-		}
+		// for _, obj := range page.Contents {
+		// 	fmt.Println("Object:", *obj.Key)
+		// }
+		objectCount = objectCount + len(page.Contents)
+		log.Printf("page no:%d objects-count:%d", pagesCount, objectCount)
 		//fmt.Println("Num objects:", len(page.Contents))
 	}
-	return nil
+
+	log.Println("total pages:", pagesCount)
+	log.Println("total objectsCount:", objectCount)
+
+	return objectCount, nil
+}
+func getAllObjCount(paginator *s3.ListObjectsV2Paginator) (int, error) {
+	var pagesCount int
+	var objectCount int
+	for paginator.HasMorePages() {
+		pagesCount++
+
+		// Next Page takes a new context for each page retrieval. This is where
+		// you could add timeouts or deadlines.
+		page, err := paginator.NextPage(context.TODO())
+		if err != nil {
+			return objectCount, err
+		}
+		//_ = page
+		// Log the objects found
+		// for _, obj := range page.Contents {
+		// 	fmt.Println("Object:", *obj.Key)
+		// }
+		objectCount = objectCount + len(page.Contents)
+		log.Printf("page no:%d objects-count:%d", pagesCount, objectCount)
+		//fmt.Println("Num objects:", len(page.Contents))
+	}
+	log.Println("total pages:", pagesCount)
+	log.Println("total objectsCount:", objectCount)
+	return objectCount, nil
 }
 
 func (s *S3Client) GetObjectsForBucket(bucket string) error {

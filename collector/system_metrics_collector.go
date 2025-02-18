@@ -1,10 +1,9 @@
 package collector
 
 import (
-	"encoding/json"
+	"ChintuIdrive/storage-node-watchdog/conf"
 	"fmt"
 	"log"
-	"net/http"
 	"path/filepath"
 	"time"
 
@@ -18,7 +17,7 @@ import (
 // Structs for JSON response
 type SystemStats struct {
 	CPUStats        *CpuStats             `json:"cpu_stats"`
-	RAMStats        MemoryStats           `json:"ram_stats"`
+	RAMStats        *MemoryStats          `json:"ram_stats"`
 	DiskStatsMap    map[string]*DiskStats `json:"disk-stats-map"`
 	ActiveConnCount int                   `json:"active_connections"`
 	LastUpdated     time.Time             `json:"last_updated"`
@@ -55,12 +54,19 @@ type DiskUsageStat struct {
 
 //var monitoreddisks = []string{"/", "/data1", "/data2", "/data3", "/data4"}
 
-type SyatemStatsCollector struct {
-	systemStats *SystemStats
+type SystemStatsCollector struct {
+	config *conf.Config
+	//systemStats *SystemStats
+}
+
+func NewSystemStatsCollector(config *conf.Config) *SystemStatsCollector {
+	return &SystemStatsCollector{
+		config: config,
+	}
 }
 
 // Collect system metrics
-func (smc *SyatemStatsCollector) CollectSystemMetrics(monitoreddisks []string) *SystemStats {
+func (smc *SystemStatsCollector) CollectSystemMetrics() *SystemStats {
 	cpuUsage, _ := cpu.Percent(time.Second, true)
 	memStats, _ := mem.VirtualMemory()
 	connCount, _ := getActiveConnections()
@@ -75,21 +81,24 @@ func (smc *SyatemStatsCollector) CollectSystemMetrics(monitoreddisks []string) *
 	}
 
 	statsLock.Lock()
+	cpustats := &CpuStats{
+		CPUUsage:  cpuUsage[0],
+		AvgLoad1:  loadAvg.Load1,
+		AvgLoad5:  loadAvg.Load5,
+		AvgLoad15: loadAvg.Load15,
+		CoreCount: corescount,
+	}
 
-	smc.systemStats = &SystemStats{
-		CPUStats: &CpuStats{
-			CPUUsage:  cpuUsage[0],
-			AvgLoad1:  loadAvg.Load1,
-			AvgLoad5:  loadAvg.Load5,
-			AvgLoad15: loadAvg.Load15,
-			CoreCount: corescount,
-		},
-		RAMStats: MemoryStats{
-			Total:       memStats.Total,
-			Used:        memStats.Used,
-			UsedPercent: memStats.UsedPercent,
-			Free:        memStats.Free,
-		},
+	lcmemStats := &MemoryStats{
+		Total:       memStats.Total,
+		Used:        memStats.Used,
+		UsedPercent: memStats.UsedPercent,
+		Free:        memStats.Free,
+	}
+
+	systemStats := &SystemStats{
+		CPUStats:     cpustats,
+		RAMStats:     lcmemStats,
 		DiskStatsMap: make(map[string]*DiskStats),
 		// TotalRead:       totalRead,
 		// TotalWrite:      totalWrite,
@@ -98,6 +107,7 @@ func (smc *SyatemStatsCollector) CollectSystemMetrics(monitoreddisks []string) *
 	}
 	// Disk I/O
 	//diskUsageMap := make(map[string]*DiskUsageStat)
+	monitoreddisks := smc.config.GetDisksToMonitor()
 	for _, diskName := range monitoreddisks {
 		diskUsageStat, err := disk.Usage(diskName)
 		if err != nil {
@@ -121,7 +131,7 @@ func (smc *SyatemStatsCollector) CollectSystemMetrics(monitoreddisks []string) *
 			DiskUsageStat: diskUsageStats,
 			DiskIOStat:    diskiotat,
 		}
-		smc.systemStats.DiskStatsMap[diskName] = diskStat
+		systemStats.DiskStatsMap[diskName] = diskStat
 		//diskUsageMap[diskName] =
 
 	}
@@ -132,8 +142,8 @@ func (smc *SyatemStatsCollector) CollectSystemMetrics(monitoreddisks []string) *
 	// 	totalRead/1024/1024, totalWrite/1024/1024, rootFsStats.Free/1024/1024/1024)
 
 	// Check for alerts
-
-	return smc.systemStats
+	//smc.systemStats = systemStats
+	return systemStats
 
 }
 
@@ -159,13 +169,4 @@ func getActiveConnections() (int, error) {
 		return 0, err
 	}
 	return len(connections), nil
-}
-
-// API Handler: Get system stats
-func (smc *SyatemStatsCollector) SystemMetricsHandler(w http.ResponseWriter, r *http.Request) {
-	statsLock.RLock()
-	defer statsLock.RUnlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(smc.systemStats)
 }

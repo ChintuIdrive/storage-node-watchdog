@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"ChintuIdrive/storage-node-watchdog/conf"
 	"ChintuIdrive/storage-node-watchdog/dto"
 	"encoding/json"
 	"fmt"
@@ -10,22 +11,23 @@ import (
 )
 
 type APIserverClient struct {
-	apiServerDNS string
-	tenantList   string
+	apiserverConfig *conf.ApiServerConfig
 }
 
-func NewApiServerClient() *APIserverClient {
-	return &APIserverClient{}
+func NewApiServerClient(apiserverConfig *conf.ApiServerConfig) *APIserverClient {
+	return &APIserverClient{
+		apiserverConfig: apiserverConfig,
+	}
 }
 
-func (asc *APIserverClient) GetTenatsListFromApiServer(nodeId string) ([]dto.Tenant, error) {
+func (asc *APIserverClient) GetTenatsListFromApiServer() ([]dto.Tenant, error) {
 
 	var tenatList []dto.Tenant
 
-	url := fmt.Sprintf("https://%s/%s", asc.apiServerDNS, asc.tenantList)
+	url := fmt.Sprintf("https://%s/%s", asc.apiserverConfig.APIServerDNS, asc.apiserverConfig.TenantListApi)
 	method := "POST"
 
-	payload := []byte(`{"NodeId":"nc1"}`)
+	payload := []byte(fmt.Sprintf(`{"NodeId":"%s"}`, asc.apiserverConfig.NodeId))
 
 	res, err := FireRequest(method, url, payload)
 	if err != nil {

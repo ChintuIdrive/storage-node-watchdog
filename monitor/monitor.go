@@ -6,17 +6,16 @@ import (
 	"ChintuIdrive/storage-node-watchdog/conf"
 )
 
-func StartMonitoring(config *conf.Config) {
-	systemStatsMonitor := NewSystemStatsMonitor()
-	go systemStatsMonitor.MonitorSystemStats(config.MonitoredDisks)
+func StartMonitoring(config *conf.Config, cc *clients.ControllerClient, asc *clients.APIserverClient,
+	ssc *collector.SystemStatsCollector, pmc *collector.ProcesMetricsCollector, s3mc *collector.S3MetricCollector) {
 
-	apiserverClient := clients.NewApiServerClient()
-	controllerClient := clients.NewControllerClientt(config.ControllerDNS, config.AddServiceAccountApi, config.GetTenantInfoApi)
-	pmc := collector.NewProcesMetricsCollector()
-	s3mc := collector.NewS3MetricCollector(controllerClient)
-	processStatsMonitor := NewPrcessStatsMonitor(pmc, s3mc, apiserverClient, controllerClient)
+	systemStatsMonitor := NewSystemStatsMonitor(ssc)
+	go systemStatsMonitor.MonitorSystemStats()
 
-	go processStatsMonitor.MonitorProcess(config.MonitoredProcesses)
-	go processStatsMonitor.MonitorTenantsProcessMetrics(config.NodeId, config.TenantProcessName)
+	processStatsMonitor := NewPrcessStatsMonitor(pmc, s3mc, asc, cc)
+
+	go processStatsMonitor.MonitorProcess()
+	go processStatsMonitor.MonitorTenantsProcessMetrics()
 	go processStatsMonitor.MonitorTenantsS3Stats()
+
 }

@@ -2,7 +2,9 @@ package monitor
 
 import (
 	"ChintuIdrive/storage-node-watchdog/collector"
+	"encoding/json"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -22,16 +24,18 @@ var lastCPUAlert time.Time
 var lastMemAlert time.Time
 
 type SystemStatsMonitor struct {
-	ssc *collector.SyatemStatsCollector
+	ssc *collector.SystemStatsCollector
 }
 
-func NewSystemStatsMonitor() *SystemStatsMonitor {
-	return &SystemStatsMonitor{}
+func NewSystemStatsMonitor(ssc *collector.SystemStatsCollector) *SystemStatsMonitor {
+	return &SystemStatsMonitor{
+		ssc: ssc,
+	}
 }
 
-func (ssm *SystemStatsMonitor) MonitorSystemStats(monitoreddisks []string) {
+func (ssm *SystemStatsMonitor) MonitorSystemStats() {
 	for {
-		systemStats := ssm.ssc.CollectSystemMetrics(monitoreddisks)
+		systemStats := ssm.ssc.CollectSystemMetrics()
 		// Log the system metrics
 		log.Printf("System Stats")
 		log.Printf("CPU Usage: %.2f%%, RAM Usage:  %.2f%%, Total RAM: %d MB, Active Connections: %d",
@@ -41,6 +45,11 @@ func (ssm *SystemStatsMonitor) MonitorSystemStats(monitoreddisks []string) {
 		checkAlerts(systemStats.CPUStats.AvgLoad1, systemStats.CPUStats.CPUUsage, systemStats.RAMStats.UsedPercent)
 		time.Sleep(15 * time.Second) // Adjust as needed
 	}
+}
+func (ssm *SystemStatsMonitor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	systemMetrics := ssm.ssc.CollectSystemMetrics()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(systemMetrics)
 }
 
 // Check if system stats exceed thresholds and trigger alerts

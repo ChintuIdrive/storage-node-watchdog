@@ -1,8 +1,7 @@
 package collector
 
 import (
-	"encoding/json"
-	"net/http"
+	"ChintuIdrive/storage-node-watchdog/conf"
 	"strings"
 
 	"github.com/shirou/gopsutil/process"
@@ -23,20 +22,23 @@ type TenantProcessMetrics struct {
 }
 
 type ProcesMetricsCollector struct {
-	processStats      []ProcessMetrics
-	tenatProcessStats []TenantProcessMetrics
+	config *conf.Config
+	//processStats      []ProcessMetrics
+	//tenatProcessStats []TenantProcessMetrics
 }
 
-func NewProcesMetricsCollector() *ProcesMetricsCollector {
-	return &ProcesMetricsCollector{}
+func NewProcesMetricsCollector(config *conf.Config) *ProcesMetricsCollector {
+	return &ProcesMetricsCollector{
+		config: config,
+	}
 }
 
 // Processes to monitor
 //var monitoredProcesses = []string{"minio", "e2_node_controller_service", "trash-cleaner-service", "rclone", "kes", "vault", "load-simulator"}
 
 // Collect per-process metrics
-func (pmc *ProcesMetricsCollector) CollectProcessMetrics(monitoredProcesses []string) []ProcessMetrics {
-
+func (pmc *ProcesMetricsCollector) CollectProcessMetrics() []ProcessMetrics {
+	monitoredProcesses := pmc.config.GetProcessToMonitor()
 	//for {
 	processList, _ := process.Processes()
 	var metrics []ProcessMetrics
@@ -62,20 +64,21 @@ func (pmc *ProcesMetricsCollector) CollectProcessMetrics(monitoredProcesses []st
 		}
 	}
 
-	statsLock.Lock()
-	pmc.processStats = metrics
-	statsLock.Unlock()
+	// statsLock.Lock()
+	// pmc.processStats = metrics
+	// statsLock.Unlock()
 
-	return pmc.processStats
+	return metrics
 	//time.Sleep(15 * time.Second) // Adjust interval as needed
 	//}
 }
 
-func (pmc *ProcesMetricsCollector) GetProcessMetrics() []ProcessMetrics {
-	return pmc.processStats
-}
+// func (pmc *ProcesMetricsCollector) GetProcessMetrics() []ProcessMetrics {
+// 	return pmc.processStats
+// }
 
-func (pmc *ProcesMetricsCollector) CollectRunningTenantProcMetrics(tenatProcessName string) []TenantProcessMetrics {
+func (pmc *ProcesMetricsCollector) CollectRunningTenantProcMetrics() []TenantProcessMetrics {
+	tenatProcessName := pmc.config.TenantProcessName
 	processList, _ := process.Processes()
 	var tenantMetrics []TenantProcessMetrics
 
@@ -101,21 +104,8 @@ func (pmc *ProcesMetricsCollector) CollectRunningTenantProcMetrics(tenatProcessN
 			tenantMetrics = append(tenantMetrics, tenatProcess)
 		}
 	}
-	statsLock.Lock()
-	pmc.tenatProcessStats = tenantMetrics
-	statsLock.Unlock()
-	return pmc.tenatProcessStats
-}
-func (pmc *ProcesMetricsCollector) GetMinioProcessMetrics() []TenantProcessMetrics {
-	return pmc.tenatProcessStats
-}
-
-// API Handler: Get process metrics
-// if cpuusage and memusage are crossing threshold for 5 min interva then raise the alarm use ticker to check the threshold
-func (pmc *ProcesMetricsCollector) ProcessMetricsHandler(w http.ResponseWriter, r *http.Request) {
-	statsLock.RLock()
-	defer statsLock.RUnlock()
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(pmc.processStats)
+	// statsLock.Lock()
+	// pmc.tenatProcessStats = tenantMetrics
+	// statsLock.Unlock()
+	return tenantMetrics
 }

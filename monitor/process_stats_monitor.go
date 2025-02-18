@@ -26,9 +26,9 @@ func NewPrcessStatsMonitor(pmc *collector.ProcesMetricsCollector, s3mc *collecto
 
 //var monitoredProcesses = []string{"minio", "e2_node_controller_service", "trash-cleaner-service", "rclone", "kes", "vault", "load-simulator"}
 
-func (psa *PrcessStatsMonitor) MonitorProcess(monitoredProcesses []string) {
+func (psa *PrcessStatsMonitor) MonitorProcess() {
 	for {
-		processMetrics := psa.procMetricCollector.CollectProcessMetrics(monitoredProcesses)
+		processMetrics := psa.procMetricCollector.CollectProcessMetrics()
 		for _, metric := range processMetrics {
 			// analyze metric and notify to admin using api server api
 			log.Printf("analyzing prcess:%s", metric.Name)
@@ -39,15 +39,15 @@ func (psa *PrcessStatsMonitor) MonitorProcess(monitoredProcesses []string) {
 	}
 }
 
-func (psm *PrcessStatsMonitor) MonitorTenantsProcessMetrics(nodeId, tenatProcessName string) {
+func (psm *PrcessStatsMonitor) MonitorTenantsProcessMetrics() {
 
 	for {
-		tenantsFromApiServer, err := psm.apiServerClient.GetTenatsListFromApiServer(nodeId)
+		tenantsFromApiServer, err := psm.apiServerClient.GetTenatsListFromApiServer()
 		if err != nil {
 			//notify watchdog not able to fetch tenantlist from api server
 			log.Printf("Failed to fetch tenant list from API server: %v", err)
 		}
-		runningTenats := psm.procMetricCollector.CollectRunningTenantProcMetrics(tenatProcessName)
+		runningTenats := psm.procMetricCollector.CollectRunningTenantProcMetrics()
 		for _, tenant := range tenantsFromApiServer {
 			tenantProcessInfo, err := psm.controllerClient.GetTenantWithProcessInfo(tenant)
 			if err != nil {
@@ -74,7 +74,7 @@ func (psm *PrcessStatsMonitor) MonitorTenantsProcessMetrics(nodeId, tenatProcess
 func (psm *PrcessStatsMonitor) MonitorTenantsS3Stats() {
 
 	for {
-		tenantsFromApiServer, err := psm.apiServerClient.GetTenatsListFromApiServer("nc1")
+		tenantsFromApiServer, err := psm.apiServerClient.GetTenatsListFromApiServer()
 		if err != nil {
 			//notify watchdog not able to fetch tenantlist from api server
 			log.Printf("Failed to fetch tenant list from API server: %v", err)
@@ -88,8 +88,9 @@ func (psm *PrcessStatsMonitor) MonitorTenantsS3Stats() {
 			}
 			// analyze s3stats and notify if any metric reach the threshold
 			log.Printf("Tenant: %s, BucketCount: %d, Time taken in bucket listing: %v", s3stats.DNS, s3stats.BucketsCount, s3stats.BucketListingDuration)
-			for bucket, timetaken := range s3stats.ObjectListingDurationMap {
-				log.Printf("Tenant: %s, Bucket: %s, Time taken in object listing: %v", s3stats.DNS, bucket, timetaken)
+			for bucket, objMetric := range s3stats.ObjectMetricsMap {
+
+				log.Printf("Tenant: %s, Bucket: %s, ObjectCount %d, Time taken in object listing: %v", s3stats.DNS, bucket, objMetric.ObjectsCount, objMetric.ObjecttListingDuration.Seconds())
 			}
 		}
 		time.Sleep(15 * time.Second) // Adjust interval as needed
