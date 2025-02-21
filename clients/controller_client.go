@@ -184,9 +184,9 @@ func (cc *ControllerClient) LoadS3Credentials(tenant dto.Tenant) (*cryption.Secr
 		return nil, err
 	}
 	accKey.SecretKey.DString = ds
-	if err != nil {
-		log.Printf("Failed to set secret key for tenant %s: %v", tenant.DNS, err)
-	}
+	// if err != nil {
+	// 	log.Printf("Failed to set secret key for tenant %s: %v", tenant.DNS, err)
+	// }
 	accKeyDir := filepath.Join(cc.controllerConfig.AccessKeyDir, tenant.DNS)
 	if _, err := os.Stat(accKeyDir); os.IsNotExist(err) {
 		err := os.MkdirAll(cc.controllerConfig.AccessKeyDir, os.ModePerm)

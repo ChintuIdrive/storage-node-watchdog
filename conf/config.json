@@ -30,11 +30,5 @@
     "/data2",
     "/data3",
     "/data4"
-  ],
-  "tenant-s3-config-map": {
-    "": {
-      "bucket-selector": 0,
-      "page-selector": 0
-    }
-  }
+  ]
   }

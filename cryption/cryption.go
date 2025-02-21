@@ -62,7 +62,7 @@ func decryptAES128CBC(encryptedData, key, iv []byte) ([]byte, error) {
 	mode.CryptBlocks(decrypted, encryptedData)
 
 	// Debug: Print decrypted bytes before removing padding
-	fmt.Println("Decrypted raw bytes:", decrypted)
+	//fmt.Println("Decrypted raw bytes:", decrypted)
 
 	// Remove PKCS7 padding
 	return removePKCS7Padding(decrypted)

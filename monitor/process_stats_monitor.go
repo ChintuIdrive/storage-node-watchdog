@@ -35,7 +35,7 @@ func (psa *PrcessStatsMonitor) MonitorProcess() {
 			log.Printf("Process: %s, PID: %d, CPU Usage: %.2f%%, Memory Usage: %.2f%%", metric.Name, metric.PID, metric.CPUUsage, metric.MemUsage)
 		}
 
-		time.Sleep(15 * time.Second) // Adjust interval as needed
+		time.Sleep(15 * time.Minute) // Adjust interval as needed
 	}
 }
 
@@ -66,7 +66,7 @@ func (psm *PrcessStatsMonitor) MonitorTenantsProcessMetrics() {
 
 			log.Printf("Tenant: %s, PID: %d, CPU Usage: %.2f%%, Memory Usage: %.2f%%", tenantProcessInfo.DNS, runningTenant.PID, runningTenant.CPUUsage, runningTenant.MemUsage)
 		}
-		time.Sleep(15 * time.Second) // Adjust interval as needed
+		time.Sleep(15 * time.Minute) // Adjust interval as needed
 	}
 
 }
@@ -93,7 +93,7 @@ func (psm *PrcessStatsMonitor) MonitorTenantsS3Stats() {
 				log.Printf("Tenant: %s, Bucket: %s, ObjectCount %d, Time taken in object listing: %v", s3stats.DNS, bucket, objMetric.ObjectsCount, objMetric.ObjecttListingDuration.Seconds())
 			}
 		}
-		time.Sleep(15 * time.Second) // Adjust interval as needed
+		time.Sleep(15 * time.Minute) // Adjust interval as needed
 
 	}
 

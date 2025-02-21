@@ -7,16 +7,17 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Config struct {
-	LogFilePath        string               `json:"log-file-path"`
-	TenantProcessName  string               `json:"tenant-process-name"`
-	MonitoredProcesses []string             `json:"monitored-processes"`
-	MonitoredDisks     []string             `json:"monitored-disks"`
-	ApiServerConfig    *ApiServerConfig     `json:"api-server-config"`
-	ControllerConfig   *ControllerConfig    `json:"controller-config"`
-	TenatS3ConfigMap   map[string]*S3Config `json:"tenant-s3-config-map"`
+	LogFilePath          string               `json:"log-file-path"`
+	TenantProcessName    string               `json:"tenant-process-name"`
+	MonitoredProcesses   []string             `json:"monitored-processes"`
+	MonitoredDisks       []string             `json:"monitored-disks"`
+	ApiServerConfig      *ApiServerConfig     `json:"api-server-config"`
+	ControllerConfig     *ControllerConfig    `json:"controller-config"`
+	SystemLevelThreshold SystemLevelThreshold `json:"system-level-threshold"`
 }
 
 type ApiServerConfig struct {
@@ -42,6 +43,17 @@ type S3Config struct {
 	DNS            string `json:"dns"`
 	BucketSelector int    `json:"bucket-selector"`
 	PageSelector   int    `json:"page-selector"`
+}
+
+type SystemLevelThreshold struct {
+	HighAvgLoadThreshold     float64
+	HighAvgLoadDuration      time.Duration
+	HighCPUusageThreshold    float64 // Alert if CPU > 80%
+	HighCPUusageDuration     time.Duration
+	HighMemoryUsageThreshold float64 // Alert if RAM usage > 90%
+	HighMemoryUsageDuration  time.Duration
+	HighDiskUsageThreshold   float64
+	HighDiskUsageDuration    time.Duration
 }
 
 func LoadConfig(filePath string) (*Config, error) {
@@ -94,10 +106,27 @@ func GetDefaultConfig() *Config {
 			"/data3",
 			"/data4",
 		},
-		TenatS3ConfigMap: make(map[string]*S3Config),
+
+		SystemLevelThreshold: SystemLevelThreshold{
+			HighAvgLoadThreshold:     2.0,
+			HighAvgLoadDuration:      1 * time.Minute,
+			HighCPUusageThreshold:    90, //in percent
+			HighCPUusageDuration:     1 * time.Minute,
+			HighMemoryUsageThreshold: 20, // in percent
+			HighMemoryUsageDuration:  1 * time.Minute,
+			HighDiskUsageThreshold:   50, //in %
+			HighDiskUsageDuration:    1 * time.Minute,
+		},
+		//TenatS3ConfigMap: make(map[string]*S3Config),
 	}
 }
 
+func (config *Config) GetSystemLevelThreshold() SystemLevelThreshold {
+	return config.SystemLevelThreshold
+}
+func (config *Config) SetSystemLevelThreshold(sysThreshold SystemLevelThreshold) {
+	config.SystemLevelThreshold = sysThreshold
+}
 func (config *Config) GetProcessToMonitor() []string {
 	return config.MonitoredProcesses
 }
@@ -146,7 +175,7 @@ func (config *Config) AddDefaultS3Config(tenant dto.Tenant) (*S3Config, error) {
 
 	s3configFile.Write(s3configData)
 
-	config.TenatS3ConfigMap[tenant.DNS] = s3config
+	//config.TenatS3ConfigMap[tenant.DNS] = s3config
 
 	return s3config, nil
 }
@@ -168,7 +197,7 @@ func (config *Config) GetS3Config(tenant dto.Tenant) (*S3Config, error) {
 		return config.AddDefaultS3Config(tenant)
 	}
 
-	config.TenatS3ConfigMap[tenant.DNS] = &s3config
+	//config.TenatS3ConfigMap[tenant.DNS] = &s3config
 	return &s3config, nil
 }
 
