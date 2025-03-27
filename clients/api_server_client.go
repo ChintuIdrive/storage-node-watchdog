@@ -1,23 +1,38 @@
 package clients
 
 import (
-	"ChintuIdrive/storage-node-watchdog/conf"
 	"ChintuIdrive/storage-node-watchdog/dto"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 )
 
 type APIserverClient struct {
-	apiserverConfig *conf.ApiServerConfig
+	apiserverConfig *dto.ApiServerConfig
 }
 
-func NewApiServerClient(apiserverConfig *conf.ApiServerConfig) *APIserverClient {
+func NewApiServerClient(apiserverConfig *dto.ApiServerConfig) *APIserverClient {
 	return &APIserverClient{
 		apiserverConfig: apiserverConfig,
 	}
+}
+
+func (asc *APIserverClient) Notify(payload []byte) {
+	log.Println("Notifying to API server")
+	log.Printf("Notification Payload: %s", string(payload))
+	// url := fmt.Sprintf("https://%s/%s", asc.apiserverConfig.APIServerDNS, asc.apiserverConfig.Notify)
+	// method := "POST"
+
+	// res, err := FireRequest(method, url, payload)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+
+	// defer res.Body.Close()
+
 }
 
 func (asc *APIserverClient) GetTenatsListFromApiServer() ([]dto.Tenant, error) {

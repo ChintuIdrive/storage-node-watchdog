@@ -24,7 +24,7 @@ type SystemStats struct {
 	CoreCount       int                   `json:"core_count"`
 	ActiveConnCount int                   `json:"active_connections"`
 	LastUpdated     time.Time             `json:"last_updated"`
-	CPUStats        *CpuStats             `json:"cpu_stats"`
+	CPUStats        CpuStats              `json:"cpu_stats"`
 	RAMStats        *MemoryStats          `json:"ram_stats"`
 	DiskStatsMap    map[string]*DiskStats `json:"disk-stats-map"`
 }
@@ -95,7 +95,7 @@ func (smc *SystemStatsCollector) CollectSystemMetrics() *SystemStats {
 	// }
 
 	statsLock.Lock()
-	cpustats := &CpuStats{
+	cpustats := CpuStats{
 		CPUUsage:  cpuUsage[0],
 		AvgLoad1:  loadAvg.Load1,
 		AvgLoad5:  loadAvg.Load5,

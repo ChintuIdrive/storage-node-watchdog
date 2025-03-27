@@ -17,7 +17,7 @@ func NewProcessMetricsHandler(processCollector *collector.ProcesMetricsCollector
 }
 
 func (pmh *ProcessMetricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	processMetrics := pmh.processCollector.CollectProcessMetrics()
+	processMetrics := pmh.processCollector.GetProcessMetrics()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(processMetrics)
 }

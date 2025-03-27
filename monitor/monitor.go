@@ -9,13 +9,13 @@ import (
 func StartMonitoring(config *conf.Config, cc *clients.ControllerClient, asc *clients.APIserverClient,
 	ssc *collector.SystemStatsCollector, pmc *collector.ProcesMetricsCollector, s3mc *collector.S3MetricCollector) {
 
-	systemStatsMonitor := NewSystemStatsMonitor(ssc)
-	go systemStatsMonitor.MonitorSystemStats()
+	// systemStatsMonitor := NewSystemStatsMonitor(ssc, asc, config)
+	// go systemStatsMonitor.MonitorSystemStats()
 
-	processStatsMonitor := NewPrcessStatsMonitor(pmc, s3mc, asc, cc)
+	processStatsMonitor := NewPrcessStatsMonitor(config, pmc, s3mc, asc, cc)
 
-	go processStatsMonitor.MonitorProcess()
+	//go processStatsMonitor.MonitorProcess()
 	go processStatsMonitor.MonitorTenantsProcessMetrics()
-	go processStatsMonitor.MonitorTenantsS3Stats()
+	//go processStatsMonitor.MonitorTenantsS3Stats()
 
 }

@@ -1,0 +1,63 @@
+{
+    "disk_usage-not": {
+        "monitor-type": "system",
+        "node-id": "nc1",
+        "time-stamp": "2025-03-10T06:09:05-04:00",
+        "metric": {
+            "name": "disk_usage",
+            "threshold": 50,
+            "high_load_duration": 300000000000
+        },
+        "actions": [
+            "notify"
+        ],
+        "message": "[ALERT] High disk_usage on disk /data4: 77.05210553122367"
+    },
+    "cpu-usage-not": {
+        "monitor-type": "process",
+        "node-id": "nc1",
+        "time-stamp": "2025-03-10T06:20:46-04:00",
+        "metric": {
+            "name": "cpu_usage",
+            "threshold": 90,
+            "high_load_duration": 60000000000
+        },
+        "actions": [
+            "notify"
+        ],
+        "message": "[ALERT] High cpu_usage: 288.5616925195218 for 1m0s!",
+        "process-name": "load-simulator",
+        "process-id": 493358
+    },
+    "bucket-listing": {
+        "monitor-type": "s3",
+        "node-id": "nc1",
+        "time-stamp": "2025-03-10T06:25:00-04:00",
+        "metric": {
+            "name": "bucket_listing",
+            "threshold": 3,
+            "high_load_duration": 300000000000
+        },
+        "actions": [
+            "notify"
+        ],
+        "message": "[ALERT] High bucket_listing: 960.123827ms for 5m0s!",
+        "process-name": "minio",
+        "process-id": 321497,
+        "s3-dns": "r4y7.nc48.edgedrive.com"
+    },
+    "sys-avg-load-1": {
+        "monitor-type": "system",
+        "node-id": "nc1",
+        "time-stamp": "2025-03-10T06:26:19-04:00",
+        "metric": {
+            "name": "avg_load1",
+            "threshold": 2,
+            "high_load_duration": 60000000000
+        },
+        "actions": [
+            "notify"
+        ],
+        "message": "[ALERT] High avg_load1: 7.77 for 1m0s!"
+    }
+}

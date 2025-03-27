@@ -1,7 +1,6 @@
 package clients
 
 import (
-	"ChintuIdrive/storage-node-watchdog/conf"
 	"ChintuIdrive/storage-node-watchdog/cryption"
 	"ChintuIdrive/storage-node-watchdog/dto"
 	"encoding/json"
@@ -14,10 +13,10 @@ import (
 )
 
 type ControllerClient struct {
-	controllerConfig *conf.ControllerConfig
+	controllerConfig *dto.ControllerConfig
 }
 
-func NewControllerClientt(controllerConfig *conf.ControllerConfig) *ControllerClient {
+func NewControllerClientt(controllerConfig *dto.ControllerConfig) *ControllerClient {
 	return &ControllerClient{
 		controllerConfig: controllerConfig,
 	}

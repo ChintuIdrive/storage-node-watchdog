@@ -1,7 +1,12 @@
 package monitor
 
 import (
+	"ChintuIdrive/storage-node-watchdog/actions"
+	"ChintuIdrive/storage-node-watchdog/clients"
 	"ChintuIdrive/storage-node-watchdog/collector"
+	"ChintuIdrive/storage-node-watchdog/conf"
+	"ChintuIdrive/storage-node-watchdog/dto"
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -31,12 +36,18 @@ var lastWriteCountAlert time.Time
 var diskUsageAlert time.Time
 
 type SystemStatsMonitor struct {
-	ssc *collector.SystemStatsCollector
+	asc             *clients.APIserverClient
+	ssc             *collector.SystemStatsCollector
+	ResourceMetrics []*dto.Metric[float64] `json:"resource_metrics"`
+	DiskMetrics     []*dto.DiskMetrics     `json:"disk_metrics"`
+	config          *conf.Config
 }
 
-func NewSystemStatsMonitor(ssc *collector.SystemStatsCollector) *SystemStatsMonitor {
+func NewSystemStatsMonitor(ssc *collector.SystemStatsCollector, asc *clients.APIserverClient, config *conf.Config) *SystemStatsMonitor {
 	return &SystemStatsMonitor{
-		ssc: ssc,
+		ssc:    ssc,
+		asc:    asc,
+		config: config,
 	}
 }
 
@@ -49,16 +60,108 @@ func (ssm *SystemStatsMonitor) MonitorSystemStats() {
 		// 	systemStats.CPUStats.CPUUsage, systemStats.RAMStats.UsedPercent, systemStats.RAMStats.Total, systemStats.ActiveConnCount)
 		// log.Printf("Load Avg (1m): %.2f, (5m): %.2f, (15m): %.2f",
 		// 	systemStats.CPUStats.AvgLoad1, systemStats.CPUStats.AvgLoad5, systemStats.CPUStats.AvgLoad15)
-		checkMetric(systemStats.CPUStats.AvgLoad1, HighAvgLoadThreshold, &lastAvgLoadAlert, "Avg Load1")
-		checkMetric(systemStats.CPUStats.CPUUsage, CPUusageThreshold, &lastCPUAlert, "CPU Usage")
-		checkMetric(systemStats.CPUStats.CPUUsage, CPUusageThreshold, &lastCPUAlert, "CPU Usage")
-		checkMetric(systemStats.RAMStats.UsedPercent, MemoryUsageThreshold, &lastMemAlert, "Memory Usage")
 
-		for disk, diskStat := range systemStats.DiskStatsMap {
-			//checkMetric(diskStat.DiskUsageStat.UsedPercent, DiskUsageThreshold, &lastMemAlert, "Disk Usage on "+disk)
-			checkDiskUsage(disk, diskStat.DiskUsageStat)
-			checkDiskIO(disk, diskStat.DiskIOStat)
+		for _, metric := range ssm.config.SystemMetrics.ResourceMetrics {
+			switch metric.Name {
+			case "avg_load1":
+				// Handle avg_load1
+				metric.Value = systemStats.CPUStats.AvgLoad1
+				notify, msg := metric.MonitorThresholdWithDuration()
+				if notify {
+					ssm.notifySystemUsageMetric(metric, msg)
+				}
+			case "cpu_usage":
+				// Handle CPU usage
+				metric.Value = systemStats.CPUStats.CPUUsage
+				notify, msg := metric.MonitorThresholdWithDuration()
+				if notify {
+					ssm.notifySystemUsageMetric(metric, msg)
+				}
+			case "memory_usage":
+				// Handle Memory usage
+				metric.Value = systemStats.RAMStats.UsedPercent
+				notify, msg := metric.MonitorThresholdWithDuration()
+				if notify {
+					ssm.notifySystemUsageMetric(metric, msg)
+				}
+			// case "disk_usage":
+			// 	for disk, diskStat := range systemStats.DiskStatsMap {
+			// 		metric.Value=diskStat.DiskUsageStat.UsedPercent
+			// 	}
+			default:
+				// Handle unknown metric names
+			}
 		}
+		for disk, diskStat := range systemStats.DiskStatsMap {
+
+			diskWithMetric, available := findDiskMetric(disk, ssm.config.SystemMetrics.DiskMetrics)
+			if !available {
+				log.Printf("provide metric configuration for %s", disk)
+				continue
+			} else {
+				diskWithMetric.DiskUsage.Value = diskStat.DiskUsageStat.UsedPercent
+				notify, msg := diskWithMetric.DiskUsage.MonitorImmediateThreshold(disk)
+				if notify {
+					ssm.notifySystemUsageMetric(diskWithMetric.DiskUsage, msg)
+				}
+				for _, iometric := range diskWithMetric.IoMetrics {
+					switch iometric.Name {
+					case "read_bytes":
+						iometric.Value = diskStat.DiskIOStat.ReadBytes
+						notify, msg := iometric.MonitorImmediateThreshold(disk)
+						if notify {
+							ssm.notifySystemIoMetric(iometric, msg)
+						}
+					case "write_bytes":
+						iometric.Value = diskStat.DiskIOStat.WriteBytes
+						notify, msg := iometric.MonitorImmediateThreshold(disk)
+						if notify {
+							ssm.notifySystemIoMetric(iometric, msg)
+						}
+					case "read_count":
+						iometric.Value = diskStat.DiskIOStat.ReadCount
+						notify, msg := iometric.MonitorImmediateThreshold(disk)
+						if notify {
+							ssm.notifySystemIoMetric(iometric, msg)
+						}
+
+					case "write_count":
+						iometric.Value = diskStat.DiskIOStat.WriteCount
+						notify, msg := iometric.MonitorImmediateThreshold(disk)
+						if notify {
+							ssm.notifySystemIoMetric(iometric, msg)
+						}
+
+					default:
+						//
+					}
+				}
+			}
+
+		}
+
+		// avgLoad1 := ssm.config.SystemLevelMetrics.AvgLoad1
+		// avgLoad1.Value = systemStats.CPUStats.AvgLoad1
+		// avgLoad1.CheckLimit(&lastAvgLoadAlert)
+
+		// cpuUsage := ssm.config.SystemLevelMetrics.CPUusage
+		// cpuUsage.Value = systemStats.CPUStats.CPUUsage
+		// cpuUsage.CheckLimit(&lastCPUAlert)
+
+		// memUsage := ssm.config.SystemLevelMetrics.MemoryUsage
+		// memUsage.Value = systemStats.RAMStats.UsedPercent
+		// memUsage.CheckLimit(&lastMemAlert)
+
+		// checkMetric(systemStats.CPUStats.AvgLoad1, HighAvgLoadThreshold, &lastAvgLoadAlert, "Avg Load1")
+		// checkMetric(systemStats.CPUStats.CPUUsage, CPUusageThreshold, &lastCPUAlert, "CPU Usage")
+		// checkMetric(systemStats.CPUStats.CPUUsage, CPUusageThreshold, &lastCPUAlert, "CPU Usage")
+		// checkMetric(systemStats.RAMStats.UsedPercent, MemoryUsageThreshold, &lastMemAlert, "Memory Usage")
+
+		// for disk, diskStat := range systemStats.DiskStatsMap {
+		// 	//checkMetric(diskStat.DiskUsageStat.UsedPercent, DiskUsageThreshold, &lastMemAlert, "Disk Usage on "+disk)
+		// 	checkDiskUsage(disk, diskStat.DiskUsageStat)
+		// 	checkDiskIO(disk, diskStat.DiskIOStat)
+		// }
 		time.Sleep(15 * time.Second) // Adjust as needed
 	}
 }
@@ -153,4 +256,57 @@ func checkDiskUsage(diskName string, diskUsageStat *collector.DiskUsageStat) {
 		log.Printf("[ALERT] High Disk Usage on %s: %.2f%%", diskName, diskUsageStat.UsedPercent)
 		diskUsageAlert = now
 	}
+}
+
+func findDiskMetric(diskName string, disks []*dto.DiskMetrics) (*dto.DiskMetrics, bool) {
+
+	for _, diskWithMetric := range disks {
+		if diskWithMetric.Name == diskName {
+			return diskWithMetric, true
+		}
+	}
+
+	return &dto.DiskMetrics{}, false
+}
+
+func (ssm *SystemStatsMonitor) notifySystemUsageMetric(metric *dto.Metric[float64], msg string) {
+	log.Printf("[ACTION] Notify for %s", metric.Name)
+	sysNotification := actions.SystemNotification[float64]{
+		Type:      actions.SystemMetric,
+		NodeId:    ssm.config.ApiServerConfig.NodeId,
+		TimeStamp: time.Now().Format(time.RFC3339),
+		Actions:   []actions.Action{actions.Notify},
+		Metric:    metric,
+		Message:   msg,
+	}
+
+	log.Printf("System Notification: %v", sysNotification)
+	payload, err := json.Marshal(sysNotification)
+	if err != nil {
+		log.Printf("Error marshalling system notification: %v", err)
+		return
+	}
+
+	ssm.asc.Notify(payload)
+}
+
+func (ssm *SystemStatsMonitor) notifySystemIoMetric(metric *dto.Metric[uint64], msg string) {
+	log.Printf("[ACTION] Notify for %s", metric.Name)
+	sysNotification := actions.SystemNotification[uint64]{
+		Type:      actions.SystemMetric,
+		NodeId:    ssm.config.ApiServerConfig.NodeId,
+		TimeStamp: time.Now().Format(time.RFC3339),
+		Actions:   []actions.Action{actions.Notify},
+		Metric:    metric,
+		Message:   msg,
+	}
+
+	log.Printf("System Notification: %v", sysNotification)
+	payload, err := json.Marshal(sysNotification)
+	if err != nil {
+		log.Printf("Error marshalling system notification: %v", err)
+		return
+	}
+
+	ssm.asc.Notify(payload)
 }
