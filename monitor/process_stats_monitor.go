@@ -66,7 +66,15 @@ func (psm *PrcessStatsMonitor) MonitorTenantsProcessMetrics() {
 			//notify watchdog not able to fetch tenantlist from api server
 			log.Printf("Failed to fetch tenant list from API server: %v", err)
 		}
-		runningTenats := psm.procMetricCollector.CollectRunningTenantProcMetrics()
+		tenatsFromController := psm.procMetricCollector.CollectRunningTenantProcMetrics()
+		if len(tenantsFromApiServer) > len(tenatsFromController) {
+			// get tenants which is down in controller
+		} else if len(tenantsFromApiServer) < len(tenatsFromController) {
+			// get running minio process which is not assigned to any dns/tenant
+		} else {
+			//match tenant with runnining minio process
+		}
+
 		for _, tenant := range tenantsFromApiServer {
 			tenantProcessInfo, err := psm.controllerClient.GetTenantWithProcessInfo(tenant)
 			if err != nil {
@@ -74,7 +82,7 @@ func (psm *PrcessStatsMonitor) MonitorTenantsProcessMetrics() {
 				log.Printf("Tenant %s from API server not found in controller tenant list", tenant.DNS)
 				continue
 			}
-			runningTenant, found := findRunningMinioProc(*tenantProcessInfo, runningTenats)
+			runningTenant, found := findRunningMinioProc(*tenantProcessInfo, tenatsFromController)
 
 			if !found {
 				// minio process not found for tenant in running minio process list

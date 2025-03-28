@@ -24,8 +24,8 @@ type TenantProcessMetrics struct {
 
 type ProcesMetricsCollector struct {
 	config *conf.Config
-	//processStats      []ProcessMetrics
-	//tenatProcessStats []TenantProcessMetrics
+	// monitoredProcesses []ProcessMetrics
+	// tenatProcessStats  []TenantProcessMetrics
 }
 
 func NewProcesMetricsCollector(config *conf.Config) *ProcesMetricsCollector {

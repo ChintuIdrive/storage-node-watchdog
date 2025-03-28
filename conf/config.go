@@ -22,12 +22,12 @@ var MonitoredDisks = []string{
 }
 
 type Config struct {
-	LogFilePath           string                        `json:"log-file-path"`
-	TenantProcessName     string                        `json:"tenant-process-name"`
-	MonitoredDisks        []string                      `json:"monitored-disks"`
-	ApiServerConfig       *dto.ApiServerConfig          `json:"api-server-config"`
-	ControllerConfig      *dto.ControllerConfig         `json:"controller-config"`
-	SystemMetrics         dto.SystemMetrics             `json:"system-metrics"`
+	LogFilePath       string                `json:"log-file-path"`
+	TenantProcessName string                `json:"tenant-process-name"`
+	MonitoredDisks    []string              `json:"monitored-disks"`
+	ApiServerConfig   *dto.ApiServerConfig  `json:"api-server-config"`
+	ControllerConfig  *dto.ControllerConfig `json:"controller-config"`
+	//SystemMetrics         dto.SystemMetrics             `json:"system-metrics"`
 	MonitoredProcesses    []*dto.MonitoredProcess       `json:"monitored-processes"`
 	TenantProcessList     []*dto.MonitoredTenantProcess `json:"monitored-tenant-processes"`
 	TenantS3MetricsConfig []*dto.TenantS3Metrics
@@ -75,14 +75,14 @@ func GetDefaultConfig() *Config {
 		},
 
 		TenantProcessName:     "minio",
-		MonitoredProcesses:    getMonitoredProcessList(),
+		MonitoredProcesses:    GetMonitoredProcessList(),
 		TenantProcessList:     loadTenantProcess(tenants),
 		TenantS3MetricsConfig: loadTenantS3Config(tenants),
 		MonitoredDisks:        MonitoredDisks,
-		SystemMetrics: dto.SystemMetrics{
-			ResourceMetrics: getResourceMetrics(),
-			DiskMetrics:     getDiskMetrics(MonitoredDisks),
-		},
+		// SystemMetrics: dto.SystemMetrics{
+		// 	ResourceMetrics: GetResourceMetrics(),
+		// 	DiskMetrics:     GetDiskMetrics(MonitoredDisks),
+		// },
 		//ResourceMetrics: GetResorceMetrics(),
 		//TenatS3ConfigMap: make(map[string]*S3Config),
 	}
@@ -199,7 +199,7 @@ func (config *Config) LoadS3Config(tenantsFromApiServer []dto.Tenant) {
 	}
 }
 
-func getResourceMetrics() []*dto.Metric[float64] {
+func GetResourceMetrics() []*dto.Metric[float64] {
 
 	avgLoad1 := &dto.Metric[float64]{
 		Name:             "avg_load1",
@@ -231,7 +231,7 @@ func getResourceMetrics() []*dto.Metric[float64] {
 	return cpuMetrics
 }
 
-func getDiskMetrics(disks []string) []*dto.DiskMetrics {
+func GetDiskMetrics(disks []string) []*dto.DiskMetrics {
 	diskMetrics := make([]*dto.DiskMetrics, 0)
 	//iometricsMap := make(map[string][]dto.Metric[uint64], 0)
 	for _, disk := range disks {
@@ -302,33 +302,33 @@ func GetResorceMetrics() []*dto.MetricConfig {
 	return []*dto.MetricConfig{avgLoad1, cpuUsage, memUsage}
 }
 
-func (config *Config) AddReSourceMetric(metricname string, limit float64, duration int) {
+// func (config *Config) AddReSourceMetric(metricname string, limit float64, duration int) {
 
-	// if config.SystemMetrics.ResourceMetrics contains metric which name is name if it is not there then add otherwise update the values
-	// Check if the metric exists using slices.ContainsFunc
-	var metric *dto.Metric[float64]
-	existingMetric := slices.ContainsFunc(config.SystemMetrics.ResourceMetrics, func(m *dto.Metric[float64]) bool {
-		if m.Name == metricname {
-			metric = m
-			return true
-		}
-		return false
-	})
-	if existingMetric {
-		metric.Threshold = limit
-		metric.HighLoadDuration = time.Duration(duration) * time.Minute
+// 	// if config.SystemMetrics.ResourceMetrics contains metric which name is name if it is not there then add otherwise update the values
+// 	// Check if the metric exists using slices.ContainsFunc
+// 	var metric *dto.Metric[float64]
+// 	existingMetric := slices.ContainsFunc(config.SystemMetrics.ResourceMetrics, func(m *dto.Metric[float64]) bool {
+// 		if m.Name == metricname {
+// 			metric = m
+// 			return true
+// 		}
+// 		return false
+// 	})
+// 	if existingMetric {
+// 		metric.Threshold = limit
+// 		metric.HighLoadDuration = time.Duration(duration) * time.Minute
 
-	} else {
-		metric = &dto.Metric[float64]{
-			Name:             metricname,
-			Threshold:        limit,
-			HighLoadDuration: time.Duration(duration) * time.Minute, // like 5 minute
-		}
-		config.SystemMetrics.ResourceMetrics = append(config.SystemMetrics.ResourceMetrics, metric)
-	}
-}
+// 	} else {
+// 		metric = &dto.Metric[float64]{
+// 			Name:             metricname,
+// 			Threshold:        limit,
+// 			HighLoadDuration: time.Duration(duration) * time.Minute, // like 5 minute
+// 		}
+// 		config.SystemMetrics.ResourceMetrics = append(config.SystemMetrics.ResourceMetrics, metric)
+// 	}
+// }
 
-func getMonitoredProcessList() []*dto.MonitoredProcess {
+func GetMonitoredProcessList() []*dto.MonitoredProcess {
 	processNames := []string{
 		"e2_node_controller_service",
 		"trash-cleaner-service",
